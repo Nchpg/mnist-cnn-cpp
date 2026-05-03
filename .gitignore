@@ -1,0 +1,17 @@
+mnist_cnn
+mnist_server
+mnist_augment
+
+*.o
+*.d
+
+*.out
+*.exe
+*.app
+
+*.csv
+*.bin
+*.model
+
+.vscode/
+docs/

@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MNIST CNN</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f6f7f9;
+        color: #18202a;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+      }
+
+      button {
+        font: inherit;
+      }
+
+      .app {
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: minmax(320px, 420px) minmax(340px, 1fr);
+        gap: 32px;
+        padding: 32px;
+        align-items: start;
+      }
+
+      .panel {
+        background: #ffffff;
+        border: 1px solid #d9dee7;
+        border-radius: 8px;
+        padding: 20px;
+      }
+
+      .canvas-wrap {
+        display: grid;
+        gap: 16px;
+      }
+
+      h1 {
+        margin: 0 0 18px;
+        font-size: 24px;
+        line-height: 1.2;
+      }
+
+      h2 {
+        margin: 0 0 16px;
+        font-size: 18px;
+      }
+
+      canvas {
+        width: 280px;
+        height: 280px;
+        image-rendering: pixelated;
+        border: 1px solid #1f2937;
+        background: #000000;
+        touch-action: none;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .toolbar button {
+        border: 1px solid #c8ced8;
+        border-radius: 6px;
+        padding: 8px 12px;
+        background: #ffffff;
+        color: #18202a;
+        cursor: pointer;
+      }
+
+      .toolbar button.primary {
+        background: #1f6feb;
+        border-color: #1f6feb;
+        color: #ffffff;
+      }
+
+      .prediction {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 10px;
+        margin-bottom: 16px;
+      }
+
+      .prediction strong {
+        font-size: 48px;
+        line-height: 1;
+      }
+
+      .bars {
+        display: grid;
+        gap: 10px;
+      }
+
+      .bar-row {
+        display: grid;
+        grid-template-columns: 28px 1fr 64px;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .bar-track {
+        height: 18px;
+        background: #e8ecf2;
+        border-radius: 4px;
+        overflow: hidden;
+      }
+
+      .bar-fill {
+        height: 100%;
+        background: #22a06b;
+        transition: width 120ms ease;
+      }
+
+      .status {
+        min-height: 22px;
+        color: #57606a;
+        font-size: 14px;
+      }
+
+      @media (max-width: 780px) {
+        .app {
+          grid-template-columns: 1fr;
+          padding: 18px;
+        }
+
+        canvas {
+          width: min(280px, calc(100vw - 76px));
+          height: min(280px, calc(100vw - 76px));
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      const { useEffect, useRef, useState } = React;
+      const CELL_COUNT = 28;
+      const CANVAS_SIZE = 280;
+
+      function App() {
+        const canvasRef = useRef(null);
+        const drawingRef = useRef(false);
+        const [probabilities, setProbabilities] = useState(Array(10).fill(0));
+        const [prediction, setPrediction] = useState(null);
+        const [status, setStatus] = useState("Dessine un chiffre puis lance la prediction.");
+
+        useEffect(() => {
+          clearCanvas();
+        }, []);
+
+        function getContext() {
+          const canvas = canvasRef.current;
+          return canvas.getContext("2d", { willReadFrequently: true });
+        }
+
+        function clearCanvas() {
+          const ctx = getContext();
+          ctx.fillStyle = "#000";
+          ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+          setProbabilities(Array(10).fill(0));
+          setPrediction(null);
+          setStatus("Canvas vide.");
+        }
+
+        function drawAt(event) {
+          const canvas = canvasRef.current;
+          const rect = canvas.getBoundingClientRect();
+          const pointer = event.touches ? event.touches[0] : event;
+          const scaleX = CANVAS_SIZE / rect.width;
+          const scaleY = CANVAS_SIZE / rect.height;
+          const x = (pointer.clientX - rect.left) * scaleX;
+          const y = (pointer.clientY - rect.top) * scaleY;
+          const ctx = getContext();
+
+          ctx.fillStyle = "#fff";
+          ctx.beginPath();
+          ctx.arc(x, y, 14, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        function startDrawing(event) {
+          drawingRef.current = true;
+          drawAt(event);
+        }
+
+        function moveDrawing(event) {
+          if (!drawingRef.current) {
+            return;
+          }
+          event.preventDefault();
+          drawAt(event);
+        }
+
+        function stopDrawing() {
+          drawingRef.current = false;
+        }
+
+        function readPixels() {
+          const ctx = getContext();
+          const image = ctx.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+          const pixels = [];
+
+          for (let row = 0; row < CELL_COUNT; row++) {
+            for (let col = 0; col < CELL_COUNT; col++) {
+              let sum = 0;
+              for (let y = 0; y < 10; y++) {
+                for (let x = 0; x < 10; x++) {
+                  const sourceX = col * 10 + x;
+                  const sourceY = row * 10 + y;
+                  const index = (sourceY * CANVAS_SIZE + sourceX) * 4;
+                  sum += image.data[index];
+                }
+              }
+              pixels.push(Math.round(sum / 100));
+            }
+          }
+
+          return pixels;
+        }
+
+        async function predict() {
+          setStatus("Prediction en cours...");
+          try {
+            const response = await fetch("/predict", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ pixels: readPixels() }),
+            });
+
+            if (!response.ok) {
+              throw new Error(await response.text());
+            }
+
+            const result = await response.json();
+            setPrediction(result.prediction);
+            setProbabilities(result.probabilities);
+            setStatus("Prediction terminee.");
+          } catch (error) {
+            setStatus(error.message || "Erreur pendant la prediction.");
+          }
+        }
+
+        return React.createElement("main", { className: "app" },
+          React.createElement("section", { className: "panel canvas-wrap" },
+            React.createElement("h1", null, "MNIST CNN"),
+            React.createElement("canvas", {
+              ref: canvasRef,
+              width: CANVAS_SIZE,
+              height: CANVAS_SIZE,
+              onMouseDown: startDrawing,
+              onMouseMove: moveDrawing,
+              onMouseUp: stopDrawing,
+              onMouseLeave: stopDrawing,
+              onTouchStart: startDrawing,
+              onTouchMove: moveDrawing,
+              onTouchEnd: stopDrawing,
+            }),
+            React.createElement("div", { className: "toolbar" },
+              React.createElement("button", { className: "primary", onClick: predict }, "Predict"),
+              React.createElement("button", { onClick: clearCanvas }, "Clear")
+            ),
+            React.createElement("div", { className: "status" }, status)
+          ),
+          React.createElement("section", { className: "panel" },
+            React.createElement("h2", null, "Probabilites"),
+            React.createElement("div", { className: "prediction" },
+              React.createElement("span", null, "Prediction"),
+              React.createElement("strong", null, prediction === null ? "-" : prediction)
+            ),
+            React.createElement("div", { className: "bars" },
+              probabilities.map((value, digit) =>
+                React.createElement("div", { className: "bar-row", key: digit },
+                  React.createElement("span", null, digit),
+                  React.createElement("div", { className: "bar-track" },
+                    React.createElement("div", {
+                      className: "bar-fill",
+                      style: { width: `${Math.max(0, Math.min(1, value)) * 100}%` },
+                    })
+                  ),
+                  React.createElement("span", null, `${(value * 100).toFixed(1)}%`)
+                )
+              )
+            )
+          )
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+    </script>
+  </body>
+</html>
