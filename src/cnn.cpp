@@ -5,6 +5,7 @@
 #include "pooling_layer.hpp"
 #include "dense_layer.hpp"
 #include "flatten_layer.hpp"
+#include "dropout_layer.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -68,10 +69,17 @@ CNN::CNN(const std::string& config_path, unsigned int seed) : model_(), gen_(see
             current_shape = layer->get_output_shape(current_shape);
             model_.add(std::move(layer));
         }
+        else if (type == "Dropout") {
+            scalar_t ratio = layer_def["ratio"];
+            auto layer = std::make_unique<DropoutLayer>(ratio, gen_);
+            current_shape = layer->get_output_shape(current_shape);
+            model_.add(std::move(layer));
+        }
     }
 }
 
 std::vector<scalar_t> CNN::predict(const Matrix& image) {
+    model_.set_training(false);
     const Matrix& logits = model_.forward(image);
     Matrix probs(logits.rows(), logits.cols());
     Activation::softmax(logits, probs);
@@ -82,12 +90,14 @@ std::vector<scalar_t> CNN::predict(const Matrix& image) {
 }
 
 int CNN::predict_label(const Matrix& image) {
+    model_.set_training(false);
     const Matrix& logits = model_.forward(image);
     auto results = Activation::argmax(logits);
     return static_cast<int>(results[0]);
 }
 
 void CNN::train(MnistDataset& dataset, size_t epochs, scalar_t learning_rate) {
+    model_.set_training(true);
     const size_t batch_size = 32;
     const size_t total_samples = dataset.count();
     const int bar_width = 30;
@@ -149,6 +159,7 @@ void CNN::train(MnistDataset& dataset, size_t epochs, scalar_t learning_rate) {
 }
 
 scalar_t CNN::accuracy(const MnistDataset& dataset) {
+    model_.set_training(false);
     size_t correct = 0;
     const size_t eval_batch_size = 64;
     for (size_t i = 0; i < dataset.count(); i += eval_batch_size) {

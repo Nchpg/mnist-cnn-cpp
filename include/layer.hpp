@@ -21,6 +21,7 @@ public:
 
     virtual void update_weights(scalar_t /*learning_rate*/) {}
     virtual void clear_gradients() {}
+    virtual void set_training(bool /*training*/) {}
 
     virtual void save(std::ostream& /*os*/) const {}
     virtual void load(std::istream& /*is*/) {}

@@ -15,6 +15,12 @@ public:
         layers_.push_back(std::move(layer));
     }
 
+    void set_training(bool training) {
+        for (auto& layer : layers_) {
+            layer->set_training(training);
+        }
+    }
+
 
     const Matrix& forward(const Matrix& input) {
         const Matrix* x = &input;
