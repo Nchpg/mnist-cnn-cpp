@@ -9,7 +9,7 @@ TARGET := mnist_cnn
 SERVER_TARGET := mnist_server
 AUGMENT_TARGET := mnist_augment
 
-COMMON_SRC := src/cnn.cpp src/model_config.cpp src/dense_layer.cpp \
+COMMON_SRC := src/cnn.cpp src/dense_layer.cpp \
                src/mnist_dataset.cpp src/matrix.cpp \
                src/pooling_layer.cpp \
                src/conv_layer.cpp

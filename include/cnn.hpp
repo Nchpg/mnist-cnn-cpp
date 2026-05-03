@@ -1,6 +1,5 @@
 #pragma once
 
-#include "model_config.hpp"
 #include "matrix.hpp"
 #include "model.hpp"
 #include "mnist_dataset.hpp"
@@ -12,13 +11,12 @@
 
 class CNN {
 private:
-    ModelConfig config_;
     Model model_;
     std::mt19937 gen_;
     static constexpr const char* MAGIC = "mnist-cnn-v1";
 
 public:
-    CNN(const ModelConfig& config, unsigned int seed = 42);
+    CNN(const std::string& config_path, unsigned int seed = 42);
     ~CNN() = default;
     
     std::vector<scalar_t> predict(const Matrix& image);
@@ -28,5 +26,4 @@ public:
     scalar_t accuracy(const MnistDataset& dataset);
     void save(const std::string& path) const;
     void load(const std::string& path);
-    void print_config() const;
 };

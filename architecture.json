@@ -1,0 +1,19 @@
+{
+  "input_shape": {"channels": 1, "height": 28, "width": 28},
+  "layers": [
+    {"type": "Conv", "filters": 32, "kernel_size": 3},
+    {"type": "ReLU"},
+    {"type": "Conv", "filters": 32, "kernel_size": 3},
+    {"type": "ReLU"},
+    {"type": "Pool", "pool_size": 2, "stride": 2},
+    {"type": "Conv", "filters": 64, "kernel_size": 3},
+    {"type": "ReLU"},
+    {"type": "Conv", "filters": 64, "kernel_size": 3},
+    {"type": "ReLU"},
+    {"type": "Pool", "pool_size": 2, "stride": 2},
+    {"type": "Flatten"},
+    {"type": "Dense", "units": 128},
+    {"type": "ReLU"},
+    {"type": "Dense", "units": 10}
+  ]
+}

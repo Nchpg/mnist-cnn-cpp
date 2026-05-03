@@ -15,75 +15,60 @@
 #include <cmath>
 #include <memory>
 #include <random>
+#include <nlohmann/json.hpp>
 
-CNN::CNN(const ModelConfig& config, unsigned int seed)
-    : config_(config), model_(), gen_(seed) {
-    config_.validate_config();
-    
-    Shape3D current_shape = {1, config_.image_size(), config_.image_size()};
-    
+using json = nlohmann::json;
 
-    auto conv1 = std::make_unique<ConvLayer>(
-        current_shape.height, current_shape.width, current_shape.channels,
-        config_.conv_kernel_size(), config_.conv_filter_count(), gen_
-    );
-    current_shape = conv1->get_output_shape(current_shape);
-    model_.add(std::move(conv1));
-    model_.add(std::make_unique<ReluLayer>());
+CNN::CNN(const std::string& config_path, unsigned int seed) : model_(), gen_(seed) {
+    std::ifstream f(config_path);
+    json config_data = json::parse(f);
 
-    auto conv2 = std::make_unique<ConvLayer>(
-        current_shape.height, current_shape.width, current_shape.channels,
-        config_.conv_kernel_size(), config_.conv_filter_count() * 2, gen_
-    );
-    current_shape = conv2->get_output_shape(current_shape);
-    model_.add(std::move(conv2));
-    model_.add(std::make_unique<ReluLayer>());
+    Shape3D current_shape = {
+        config_data["input_shape"]["channels"],
+        config_data["input_shape"]["height"],
+        config_data["input_shape"]["width"]
+    };
 
-    auto pool1 = std::make_unique<PoolingLayer>(
-        current_shape.height, current_shape.width, current_shape.channels,
-        config_.pool_size(), config_.pool_stride()
-    );
-    current_shape = pool1->get_output_shape(current_shape);
-    model_.add(std::move(pool1));
+    for (const auto& layer_def : config_data["layers"]) {
+        std::string type = layer_def["type"];
 
-
-
-    auto conv3 = std::make_unique<ConvLayer>(
-        current_shape.height, current_shape.width, current_shape.channels,
-        config_.conv_kernel_size(), config_.conv_filter_count() * 4, gen_
-    );
-    current_shape = conv3->get_output_shape(current_shape);
-    model_.add(std::move(conv3));
-    model_.add(std::make_unique<ReluLayer>());
-
-    auto conv4 = std::make_unique<ConvLayer>(
-        current_shape.height, current_shape.width, current_shape.channels,
-        config_.conv_kernel_size(), config_.conv_filter_count() * 8, gen_
-    );
-    current_shape = conv4->get_output_shape(current_shape);
-    model_.add(std::move(conv4));
-    model_.add(std::make_unique<ReluLayer>());
-
-    auto pool2 = std::make_unique<PoolingLayer>(
-        current_shape.height, current_shape.width, current_shape.channels,
-        config_.pool_size(), config_.pool_stride()
-    );
-    current_shape = pool2->get_output_shape(current_shape);
-    model_.add(std::move(pool2));
-
-
-
-    auto flatten = std::make_unique<FlattenLayer>();
-    current_shape = flatten->get_output_shape(current_shape);
-    model_.add(std::move(flatten));
-
-    auto dense1 = std::make_unique<DenseLayer>(current_shape.size(), config_.dense_hidden_size(), gen_);
-    current_shape = dense1->get_output_shape(current_shape);
-    model_.add(std::move(dense1));
-    model_.add(std::make_unique<ReluLayer>());
-
-    auto dense2 = std::make_unique<DenseLayer>(current_shape.size(), config_.class_count(), gen_);
-    model_.add(std::move(dense2));
+        if (type == "Conv") {
+            size_t filters = layer_def["filters"];
+            size_t kernel_size = layer_def["kernel_size"];
+            auto layer = std::make_unique<ConvLayer>(
+                current_shape.height, current_shape.width, current_shape.channels,
+                kernel_size, filters, gen_
+            );
+            current_shape = layer->get_output_shape(current_shape);
+            model_.add(std::move(layer));
+        } 
+        else if (type == "ReLU") {
+            auto layer = std::make_unique<ReluLayer>();
+            current_shape = layer->get_output_shape(current_shape);
+            model_.add(std::move(layer));
+        } 
+        else if (type == "Pool") {
+            size_t pool_size = layer_def["pool_size"];
+            size_t stride = layer_def["stride"];
+            auto layer = std::make_unique<PoolingLayer>(
+                current_shape.height, current_shape.width, current_shape.channels,
+                pool_size, stride
+            );
+            current_shape = layer->get_output_shape(current_shape);
+            model_.add(std::move(layer));
+        } 
+        else if (type == "Flatten") {
+            auto layer = std::make_unique<FlattenLayer>();
+            current_shape = layer->get_output_shape(current_shape);
+            model_.add(std::move(layer));
+        } 
+        else if (type == "Dense") {
+            size_t units = layer_def["units"];
+            auto layer = std::make_unique<DenseLayer>(current_shape.size(), units, gen_);
+            current_shape = layer->get_output_shape(current_shape);
+            model_.add(std::move(layer));
+        }
+    }
 }
 
 std::vector<scalar_t> CNN::predict(const Matrix& image) {
@@ -103,7 +88,6 @@ int CNN::predict_label(const Matrix& image) {
 }
 
 void CNN::train(MnistDataset& dataset, size_t epochs, scalar_t learning_rate) {
-    config_.print_config();
     const size_t batch_size = 32;
     const size_t total_samples = dataset.count();
     const int bar_width = 30;
@@ -200,5 +184,3 @@ void CNN::load(const std::string& path) {
     for (auto& layer : model_.layers()) layer->load(file);
     file.close();
 }
-
-void CNN::print_config() const { config_.print_config(); }

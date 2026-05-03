@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <string_view>
 #include <array>
+#include <fstream>
 
 static void usage(const char *program) {
     std::cerr << "usage:\n"
@@ -15,10 +16,15 @@ static void usage(const char *program) {
 }
 
 int main(int argc, char **argv) {
-    ModelConfig config;
+    const std::string config_path = "architecture.json";
 
     if (argc >= 2 && std::string_view(argv[1]) == "architecture") {
-        config.print_config();
+        std::ifstream f(config_path);
+        if (f.is_open()) {
+            std::cout << f.rdbuf() << std::endl;
+        } else {
+            std::cerr << "Could not open " << config_path << std::endl;
+        }
         return EXIT_SUCCESS;
     }
 
@@ -27,7 +33,7 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-    CNN cnn(config, 42);
+    CNN cnn(config_path, 42);
     std::string_view command(argv[1]);
 
     if (command == "train") {
