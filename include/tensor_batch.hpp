@@ -19,7 +19,7 @@ public:
 
 
     void copy_from(const Matrix& m) {
-        this->data() = m.data();
+        this->get_raw_vector() = m.get_raw_vector();
     }
 
     void reshape4D(size_t channels, size_t height, size_t width, size_t batch_size) {

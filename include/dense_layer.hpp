@@ -19,6 +19,11 @@ private:
     const Matrix* input_ptr_ = nullptr; 
     Matrix weights_grad_;
     Matrix biases_grad_;
+    
+    // Adam states
+    Matrix m_weights_, v_weights_;
+    Matrix m_biases_, v_biases_;
+
     Matrix weights_t_;    
     Matrix input_t_;      
     Matrix grad_input_;   
@@ -31,6 +36,7 @@ public:
     const Matrix& backward(const Matrix& gradient) override;
     
     void update_weights(scalar_t learning_rate) override;
+    void update_weights_adam(scalar_t learning_rate, scalar_t beta1, scalar_t beta2, scalar_t epsilon, scalar_t m_corr, scalar_t v_corr) override;
     void clear_gradients() override;
     
     const Matrix& activations() const { return activations_; }

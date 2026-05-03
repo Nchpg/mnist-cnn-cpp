@@ -30,8 +30,11 @@ public:
 
     size_t rows() const noexcept { return rows_; }
     size_t cols() const noexcept { return cols_; }
-    const std::vector<scalar_t>& data() const noexcept { return data_; }
-    std::vector<scalar_t>& data() noexcept { return data_; }
+    size_t size() const noexcept { return data_.size(); }
+    const std::vector<scalar_t>& get_raw_vector() const noexcept { return data_; }
+    std::vector<scalar_t>& get_raw_vector() noexcept { return data_; }
+    scalar_t* data() noexcept { return data_.data(); }
+    const scalar_t* data() const noexcept { return data_.data(); }
 
 
     void fill(scalar_t value) noexcept;

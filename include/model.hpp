@@ -44,6 +44,12 @@ public:
         }
     }
 
+    void update_weights_adam(scalar_t learning_rate, scalar_t beta1, scalar_t beta2, scalar_t epsilon, scalar_t m_corr, scalar_t v_corr) {
+        for (auto& layer : layers_) {
+            layer->update_weights_adam(learning_rate, beta1, beta2, epsilon, m_corr, v_corr);
+        }
+    }
+
     void clear_gradients() {
         for (auto& layer : layers_) {
             layer->clear_gradients();

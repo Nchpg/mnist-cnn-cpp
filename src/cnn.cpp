@@ -98,9 +98,15 @@ int CNN::predict_label(const Matrix& image) {
 
 void CNN::train(MnistDataset& dataset, size_t epochs, scalar_t learning_rate) {
     model_.set_training(true);
-    const size_t batch_size = 32;
+    const size_t batch_size = 64;
     const size_t total_samples = dataset.count();
     const int bar_width = 30;
+
+    const scalar_t beta1 = 0.9f;
+    const scalar_t beta2 = 0.999f;
+    const scalar_t epsilon = 1e-8f;
+    scalar_t beta1_t = 1.0f;
+    scalar_t beta2_t = 1.0f;
     
     for (size_t epoch = 0; epoch < epochs; epoch++) {
         dataset.shuffle_indices(); 
@@ -111,6 +117,11 @@ void CNN::train(MnistDataset& dataset, size_t epochs, scalar_t learning_rate) {
         size_t samples_to_process = num_full_batches * batch_size;
 
         for (size_t sample = 0; sample < samples_to_process; sample += batch_size) {
+            beta1_t *= beta1;
+            beta2_t *= beta2;
+            scalar_t m_corr = 1.0f / (1.0f - beta1_t);
+            scalar_t v_corr = 1.0f / (1.0f - beta2_t);
+
             size_t actual_batch_size = batch_size;
             
             Matrix batch_images = dataset.get_batch_images(sample, actual_batch_size);
@@ -138,7 +149,7 @@ void CNN::train(MnistDataset& dataset, size_t epochs, scalar_t learning_rate) {
             }
             
             model_.backward(grad_output);
-            model_.update_weights(learning_rate);
+            model_.update_weights_adam(learning_rate, beta1, beta2, epsilon, m_corr, v_corr);
             model_.clear_gradients();
             
             scalar_t progress = static_cast<scalar_t>(sample + actual_batch_size) / static_cast<scalar_t>(samples_to_process);

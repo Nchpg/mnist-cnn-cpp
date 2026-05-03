@@ -20,6 +20,7 @@ public:
     virtual const Matrix& backward(const Matrix& gradient) = 0;
 
     virtual void update_weights(scalar_t /*learning_rate*/) {}
+    virtual void update_weights_adam(scalar_t /*learning_rate*/, scalar_t /*beta1*/, scalar_t /*beta2*/, scalar_t /*epsilon*/, scalar_t /*m_corr*/, scalar_t /*v_corr*/) {}
     virtual void clear_gradients() {}
     virtual void set_training(bool /*training*/) {}
 

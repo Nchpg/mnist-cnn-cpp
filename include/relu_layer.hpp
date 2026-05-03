@@ -20,9 +20,9 @@ public:
             output_.reshape(input.rows(), input.cols());
         }
         
-        size_t n = input.data().size();
-        const scalar_t* in_ptr = input.data().data();
-        scalar_t* out_ptr = output_.data().data();
+        size_t n = input.size();
+        const scalar_t* in_ptr = input.data();
+        scalar_t* out_ptr = output_.data();
 
 
         #pragma omp parallel for if(n > 10000)
@@ -37,10 +37,10 @@ public:
             grad_input_.reshape(input_ptr_->rows(), input_ptr_->cols());
         }
 
-        size_t n = input_ptr_->data().size();
-        const scalar_t* in_ptr = input_ptr_->data().data();
-        const scalar_t* grad_ptr = gradient.data().data();
-        scalar_t* out_grad_ptr = grad_input_.data().data();
+        size_t n = input_ptr_->size();
+        const scalar_t* in_ptr = input_ptr_->data();
+        const scalar_t* grad_ptr = gradient.data();
+        scalar_t* out_grad_ptr = grad_input_.data();
 
         #pragma omp parallel for if(n > 10000)
         for (size_t i = 0; i < n; ++i) {

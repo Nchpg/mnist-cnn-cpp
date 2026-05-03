@@ -35,10 +35,10 @@ public:
         std::uniform_real_distribution<scalar_t> dist(0.0f, 1.0f);
         scalar_t scale = 1.0f / (1.0f - ratio_);
         
-        size_t n = input.data().size();
-        const scalar_t* in_ptr = input.data().data();
-        scalar_t* mask_ptr = mask_.data().data();
-        scalar_t* out_ptr = output_.data().data();
+        size_t n = input.size();
+        const scalar_t* in_ptr = input.data();
+        scalar_t* mask_ptr = mask_.data();
+        scalar_t* out_ptr = output_.data();
 
         for (size_t i = 0; i < n; ++i) {
             if (dist(gen_) > ratio_) {
@@ -61,10 +61,10 @@ public:
             grad_input_.reshape(gradient.rows(), gradient.cols());
         }
 
-        size_t n = gradient.data().size();
-        const scalar_t* grad_ptr = gradient.data().data();
-        const scalar_t* mask_ptr = mask_.data().data();
-        scalar_t* in_grad_ptr = grad_input_.data().data();
+        size_t n = gradient.size();
+        const scalar_t* grad_ptr = gradient.data();
+        const scalar_t* mask_ptr = mask_.data();
+        scalar_t* in_grad_ptr = grad_input_.data();
 
         for (size_t i = 0; i < n; ++i) {
             in_grad_ptr[i] = grad_ptr[i] * mask_ptr[i];
