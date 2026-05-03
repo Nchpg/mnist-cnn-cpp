@@ -9,14 +9,21 @@
 
 #include <random>
 
+enum class OptimizerType {
+    SGD,
+    Adam
+};
+
 class CNN {
 private:
     Model model_;
     std::mt19937 gen_;
     static constexpr const char* MAGIC = "mnist-cnn-v1";
+    OptimizerType optimizer_type_;
+    scalar_t learning_rate_;
 
 public:
-    CNN(const std::string& config_path, unsigned int seed = 42);
+    CNN(const std::string& config_path, unsigned int seed = 42, OptimizerType optimizer_type = OptimizerType::Adam, scalar_t learning_rate = 0.001f);
     ~CNN() = default;
     
     std::vector<scalar_t> predict(const Matrix& image);

@@ -13,16 +13,21 @@ struct Shape3D {
     size_t size() const { return channels * height * width; }
 };
 
+struct Parameter {
+    Matrix* value;
+    Matrix* gradient;
+};
+
 class Layer {
 public:
     virtual ~Layer() = default;
-    virtual const Matrix& forward(const Matrix& input) = 0;
+virtual const Matrix& forward(const Matrix& input) = 0;
     virtual const Matrix& backward(const Matrix& gradient) = 0;
 
-    virtual void update_weights(scalar_t /*learning_rate*/) {}
-    virtual void update_weights_adam(scalar_t /*learning_rate*/, scalar_t /*beta1*/, scalar_t /*beta2*/, scalar_t /*epsilon*/, scalar_t /*m_corr*/, scalar_t /*v_corr*/) {}
     virtual void clear_gradients() {}
     virtual void set_training(bool /*training*/) {}
+
+    virtual std::vector<Parameter> get_parameters() { return {}; }
 
     virtual void save(std::ostream& /*os*/) const {}
     virtual void load(std::istream& /*is*/) {}

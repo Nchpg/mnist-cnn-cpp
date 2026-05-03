@@ -16,8 +16,10 @@ ConvLayer::ConvLayer(size_t input_rows, size_t input_cols, size_t input_channels
     scalar_t scale = std::sqrt(2.0f / static_cast<scalar_t>(weights_per_filter));
     filters_matrix_.random_uniform(scale, gen);
     
-    biases_.resize(filter_count, 0.0f);
-    biases_grad_.resize(filter_count, 0.0f);
+    biases_ = Matrix(filter_count, 1);
+    biases_grad_ = Matrix(filter_count, 1);
+    biases_.fill(0.0f);
+    biases_grad_.fill(0.0f);
 }
 
 
@@ -106,7 +108,7 @@ const Matrix& ConvLayer::forward(const Matrix& input) {
     #pragma omp parallel for collapse(2) if(b_size * f_count > 4)
     for (size_t b = 0; b < b_size; ++b) {
         for (size_t f = 0; f < f_count; ++f) {
-            scalar_t b_val = biases_[f];
+            scalar_t b_val = biases_(f, 0);
             for (size_t y = 0; y < out_h; ++y) {
                 for (size_t x = 0; x < out_w; ++x) {
                     size_t col = get_im2col_col(b, y, x, out_h, out_w);
@@ -147,7 +149,7 @@ const Matrix& ConvLayer::backward(const Matrix& gradient) {
         for (size_t col = 0; col < gemm_out_.cols(); ++col) {
             sum += gemm_out_(f, col);
         }
-        biases_grad_[f] = sum;
+        biases_grad_(f, 0) = sum;
     }
 
     Matrix::multiply_transB(gemm_out_, im2col_buffer_, filters_grad_matrix_);
@@ -159,61 +161,16 @@ const Matrix& ConvLayer::backward(const Matrix& gradient) {
     return grad_input_;
 }
 
-void ConvLayer::update_weights(scalar_t learning_rate) {
-    const size_t f_count = filters_matrix_.rows();
-    filters_matrix_.subtract_scaled(filters_grad_matrix_, learning_rate);
-    for (size_t f = 0; f < f_count; ++f) {
-        biases_[f] -= biases_grad_[f] * learning_rate;
-    }
-}
-
-void ConvLayer::update_weights_adam(scalar_t learning_rate, scalar_t beta1, scalar_t beta2, scalar_t epsilon, scalar_t m_corr, scalar_t v_corr) {
-    const size_t f_count = filters_matrix_.rows();
-    const size_t weights_per_filter = filters_matrix_.cols();
-    const size_t total_weights = f_count * weights_per_filter;
-
-    if (m_filters_.rows() == 0) {
-        m_filters_.reshape(f_count, weights_per_filter);
-        v_filters_.reshape(f_count, weights_per_filter);
-        m_biases_.reshape(f_count, 1);
-        v_biases_.reshape(f_count, 1);
-        m_filters_.fill(0.0f);
-        v_filters_.fill(0.0f);
-        m_biases_.fill(0.0f);
-        v_biases_.fill(0.0f);
-    }
-
-    scalar_t* w_ptr = filters_matrix_.data();
-    scalar_t* wg_ptr = filters_grad_matrix_.data();
-    scalar_t* mw_ptr = m_filters_.data();
-    scalar_t* vw_ptr = v_filters_.data();
-
-    #pragma omp parallel for if(total_weights > 1000)
-    for (size_t i = 0; i < total_weights; ++i) {
-        mw_ptr[i] = beta1 * mw_ptr[i] + (1.0f - beta1) * wg_ptr[i];
-        vw_ptr[i] = beta2 * vw_ptr[i] + (1.0f - beta2) * wg_ptr[i] * wg_ptr[i];
-        scalar_t m_hat = mw_ptr[i] * m_corr;
-        scalar_t v_hat = vw_ptr[i] * v_corr;
-        w_ptr[i] -= learning_rate * m_hat / (std::sqrt(v_hat) + epsilon);
-    }
-
-    scalar_t* b_ptr = biases_.data();
-    scalar_t* bg_ptr = biases_grad_.data();
-    scalar_t* mb_ptr = m_biases_.data();
-    scalar_t* vb_ptr = v_biases_.data();
-
-    for (size_t i = 0; i < f_count; ++i) {
-        mb_ptr[i] = beta1 * mb_ptr[i] + (1.0f - beta1) * bg_ptr[i];
-        vb_ptr[i] = beta2 * vb_ptr[i] + (1.0f - beta2) * bg_ptr[i] * bg_ptr[i];
-        scalar_t m_hat = mb_ptr[i] * m_corr;
-        scalar_t v_hat = vb_ptr[i] * v_corr;
-        b_ptr[i] -= learning_rate * m_hat / (std::sqrt(v_hat) + epsilon);
-    }
+std::vector<Parameter> ConvLayer::get_parameters() {
+    return {
+        {&filters_matrix_, &filters_grad_matrix_},
+        {&biases_, &biases_grad_}
+    };
 }
 
 void ConvLayer::clear_gradients() {
     filters_grad_matrix_.fill(0.0f);
-    std::fill(biases_grad_.begin(), biases_grad_.end(), 0.0f);
+    biases_grad_.fill(0.0f);
 }
 
 void ConvLayer::save(std::ostream& os) const {
@@ -221,7 +178,7 @@ void ConvLayer::save(std::ostream& os) const {
     const size_t weights_per_filter = filters_matrix_.cols();
     os << "CONV " << f_count << " " << kernel_size_ << "\n";
     for (size_t f = 0; f < f_count; ++f) {
-        os << biases_[f] << "\n";
+        os << biases_(f, 0) << "\n";
         for (size_t i = 0; i < weights_per_filter; ++i) {
             os << filters_matrix_(f, i) << (i == weights_per_filter - 1 ? "" : " ");
         }
@@ -239,7 +196,7 @@ void ConvLayer::load(std::istream& is) {
         throw std::runtime_error("Invalid ConvLayer data in model file");
     }
     for (size_t f = 0; f < f_count; ++f) {
-        is >> biases_[f];
+        is >> biases_(f, 0);
         for (size_t i = 0; i < expected_weights_per_filter; ++i) {
             is >> filters_matrix_(f, i);
         }

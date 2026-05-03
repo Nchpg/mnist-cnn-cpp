@@ -41,50 +41,11 @@ const Matrix& DenseLayer::backward(const Matrix& gradient) {
     return grad_input_;
 }
 
-void DenseLayer::update_weights(scalar_t learning_rate) {
-    weights_.subtract_scaled(weights_grad_, learning_rate);
-    biases_.subtract_scaled(biases_grad_, learning_rate);
-}
-
-void DenseLayer::update_weights_adam(scalar_t learning_rate, scalar_t beta1, scalar_t beta2, scalar_t epsilon, scalar_t m_corr, scalar_t v_corr) {
-    if (m_weights_.rows() == 0) {
-        m_weights_.reshape(output_size_, input_size_);
-        v_weights_.reshape(output_size_, input_size_);
-        m_biases_.reshape(output_size_, 1);
-        v_biases_.reshape(output_size_, 1);
-        m_weights_.fill(0.0f);
-        v_weights_.fill(0.0f);
-        m_biases_.fill(0.0f);
-        v_biases_.fill(0.0f);
-    }
-
-    size_t w_total = output_size_ * input_size_;
-    scalar_t* w_ptr = weights_.data();
-    scalar_t* wg_ptr = weights_grad_.data();
-    scalar_t* mw_ptr = m_weights_.data();
-    scalar_t* vw_ptr = v_weights_.data();
-
-    #pragma omp parallel for if(w_total > 1000)
-    for (size_t i = 0; i < w_total; ++i) {
-        mw_ptr[i] = beta1 * mw_ptr[i] + (1.0f - beta1) * wg_ptr[i];
-        vw_ptr[i] = beta2 * vw_ptr[i] + (1.0f - beta2) * wg_ptr[i] * wg_ptr[i];
-        scalar_t m_hat = mw_ptr[i] * m_corr;
-        scalar_t v_hat = vw_ptr[i] * v_corr;
-        w_ptr[i] -= learning_rate * m_hat / (std::sqrt(v_hat) + epsilon);
-    }
-
-    scalar_t* b_ptr = biases_.data();
-    scalar_t* bg_ptr = biases_grad_.data();
-    scalar_t* mb_ptr = m_biases_.data();
-    scalar_t* vb_ptr = v_biases_.data();
-
-    for (size_t i = 0; i < output_size_; ++i) {
-        mb_ptr[i] = beta1 * mb_ptr[i] + (1.0f - beta1) * bg_ptr[i];
-        vb_ptr[i] = beta2 * vb_ptr[i] + (1.0f - beta2) * bg_ptr[i] * bg_ptr[i];
-        scalar_t m_hat = mb_ptr[i] * m_corr;
-        scalar_t v_hat = vb_ptr[i] * v_corr;
-        b_ptr[i] -= learning_rate * m_hat / (std::sqrt(v_hat) + epsilon);
-    }
+std::vector<Parameter> DenseLayer::get_parameters() {
+    return {
+        {&weights_, &weights_grad_},
+        {&biases_, &biases_grad_}
+    };
 }
 
 void DenseLayer::clear_gradients() {

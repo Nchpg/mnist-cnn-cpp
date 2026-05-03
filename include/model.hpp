@@ -2,18 +2,32 @@
 #define MODEL_HPP
 
 #include "layer.hpp"
+#include "optimizer.hpp"
 #include <vector>
 #include <memory>
 
 class Model {
 private:
     std::vector<std::unique_ptr<Layer>> layers_;
+    std::unique_ptr<Optimizer> optimizer_;
 
 public:
 
     void add(std::unique_ptr<Layer> layer) {
         layers_.push_back(std::move(layer));
     }
+
+    void set_optimizer(std::unique_ptr<Optimizer> optimizer) {
+        std::vector<Parameter> all_params;
+        for (auto& layer : layers_) {
+            auto params = layer->get_parameters();
+            all_params.insert(all_params.end(), params.begin(), params.end());
+        }
+        optimizer->add_parameters(all_params);
+        optimizer_ = std::move(optimizer);
+    }
+
+    Optimizer* optimizer() { return optimizer_.get(); }
 
     void set_training(bool training) {
         for (auto& layer : layers_) {
@@ -38,15 +52,9 @@ public:
         }
     }
 
-    void update_weights(scalar_t learning_rate) {
-        for (auto& layer : layers_) {
-            layer->update_weights(learning_rate);
-        }
-    }
-
-    void update_weights_adam(scalar_t learning_rate, scalar_t beta1, scalar_t beta2, scalar_t epsilon, scalar_t m_corr, scalar_t v_corr) {
-        for (auto& layer : layers_) {
-            layer->update_weights_adam(learning_rate, beta1, beta2, epsilon, m_corr, v_corr);
+    void step() {
+        if (optimizer_) {
+            optimizer_->step();
         }
     }
 
