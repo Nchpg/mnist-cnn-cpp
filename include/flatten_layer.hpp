@@ -8,7 +8,7 @@
 
 class FlattenLayer : public Layer {
 public:
-    static constexpr const char* LAYER_NAME = "FLATTEN";
+    static constexpr const char* LAYER_MARKER = "FLAT";
 
 public:
     FlattenLayer() = default;
@@ -26,13 +26,15 @@ public:
     }
 
     void save(std::ostream& os) const override {
-        os << LAYER_NAME << "\n";
+        uint32_t marker = make_marker(LAYER_MARKER);
+        os.write(reinterpret_cast<const char*>(&marker), sizeof(marker));
     }
 
     void load(std::istream& is) override {
-        std::string type;
-        if (!(is >> type) || type != LAYER_NAME) {
-            throw std::runtime_error("Invalid FlattenLayer data: expected '" + std::string(LAYER_NAME) + "'");
+        uint32_t marker;
+        is.read(reinterpret_cast<char*>(&marker), sizeof(marker));
+        if (marker != make_marker(LAYER_MARKER)) {
+            throw std::runtime_error("Invalid FlattenLayer data in binary load");
         }
     }
 

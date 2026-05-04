@@ -19,7 +19,7 @@ private:
     static constexpr size_t CLASSES = 10;
 
     size_t count_ = 0;
-    std::vector<Matrix> images_;
+    std::vector<scalar_t> all_images_data_; // Single continuous buffer
     std::vector<unsigned char> labels_;
     std::vector<size_t> indices_;
     std::mt19937 gen_;
@@ -35,10 +35,10 @@ public:
     static scalar_t std_;
     static bool normalize_;
 
-    static void compute_normalization(const std::vector<Matrix>& images);
+    static void compute_normalization(const std::vector<scalar_t>& images_data);
     void apply_normalization();
 
-    const std::vector<Matrix>& images() const { return images_; }
+    const std::vector<scalar_t>& images_data() const { return all_images_data_; }
 
     static scalar_t mean() { return mean_; }
     static scalar_t std() { return std_; }
@@ -50,12 +50,13 @@ public:
     static MnistDataset load(const std::string& path, size_t limit = 0);
     static MnistDataset load_csv(const std::string& path, size_t limit = 0);
     static MnistDataset load_bin(const std::string& path, size_t limit = 0);
-    static Matrix parse_pixels(const std::string& line, unsigned char& label);
     
     size_t count() const { return count_; }
-    const Matrix& image(size_t index) const { 
+    Matrix image(size_t index) const { 
         if (index >= count_) throw std::out_of_range("Image index out of range");
-        return images_[index];
+        Matrix img(PIXELS, 1);
+        std::copy(all_images_data_.begin() + index * PIXELS, all_images_data_.begin() + (index + 1) * PIXELS, img.data());
+        return img;
     }
     unsigned char label(size_t index) const { 
         if (index >= count_) throw std::out_of_range("Label index out of range");
@@ -66,8 +67,6 @@ public:
 
     void get_batch_images(size_t start_idx, size_t batch_size, Matrix& out_batch) const;
     void get_batch_labels(size_t start_idx, size_t batch_size, std::vector<size_t>& out_labels) const;
-
-
 };
 
 #endif 

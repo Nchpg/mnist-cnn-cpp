@@ -62,5 +62,8 @@ public:
     void add_broadcast(const Matrix& vec);
     void sum_columns(Matrix& out) const;
 
+    void save(std::ostream& os) const;
+    void load(std::istream& is);
+
     friend std::ostream& operator<<(std::ostream& os, const Matrix& m);
 };

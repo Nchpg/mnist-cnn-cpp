@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
         cnn.set_hyperparameters(hp);
 
         MnistDataset train = MnistDataset::load(csv_path, limit);
-        MnistDataset::compute_normalization(train.images());
+        MnistDataset::compute_normalization(train.images_data());
         train.apply_normalization();
         
         std::cout << "Starting training from architecture: " << arch_json << " using " << csv_path << std::endl;

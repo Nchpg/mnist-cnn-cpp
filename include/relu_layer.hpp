@@ -6,7 +6,7 @@
 
 class ReluLayer : public Layer {
 public:
-    static constexpr const char* LAYER_NAME = "RELU";
+    static constexpr const char* LAYER_MARKER = "RELU";
 
 private:
     const Matrix* input_ptr_ = nullptr;
@@ -51,11 +51,14 @@ public:
         return grad_input_;
     }
 
-    void save(std::ostream& os) const override { os << LAYER_NAME << "\n"; }
+    void save(std::ostream& os) const override { 
+        uint32_t marker = make_marker(LAYER_MARKER);
+        os.write(reinterpret_cast<const char*>(&marker), sizeof(marker));
+    }
     void load(std::istream& is) override {
-        std::string type;
-        is >> type;
-        if (type != LAYER_NAME) throw std::runtime_error("Architecture mismatch in ReluLayer");
+        uint32_t marker;
+        is.read(reinterpret_cast<char*>(&marker), sizeof(marker));
+        if (marker != make_marker(LAYER_MARKER)) throw std::runtime_error("Architecture mismatch in ReluLayer load");
     }
 
     nlohmann::json get_config() const override { return {{"type", "ReLU"}}; }

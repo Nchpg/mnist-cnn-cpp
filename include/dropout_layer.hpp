@@ -2,13 +2,14 @@
 #define DROPOUT_LAYER_HPP
 
 #include "layer.hpp"
+#include <omp.h>
 #include <random>
 #include <string>
 #include <stdexcept>
 
 class DropoutLayer : public Layer {
 public:
-    static constexpr const char* LAYER_NAME = "DROPOUT";
+    static constexpr const char* LAYER_MARKER = "DROP";
 
 private:
     scalar_t ratio_;
@@ -17,9 +18,15 @@ private:
     Matrix output_;
     Matrix grad_input_;
     std::mt19937& gen_;
+    std::vector<std::mt19937> thread_gens_;
 
 public:
-    DropoutLayer(scalar_t ratio, std::mt19937& gen) : ratio_(ratio), gen_(gen) {}
+    DropoutLayer(scalar_t ratio, std::mt19937& gen) : ratio_(ratio), gen_(gen) {
+        int max_threads = omp_get_max_threads();
+        for (int i = 0; i < max_threads; ++i) {
+            thread_gens_.emplace_back(gen());
+        }
+    }
 
     void set_training(bool training) override {
         is_training_ = training;
@@ -35,21 +42,27 @@ public:
             output_.reshape(input.rows(), input.cols());
         }
 
-        std::uniform_real_distribution<scalar_t> dist(0.0f, 1.0f);
         scalar_t scale = 1.0f / (1.0f - ratio_);
-
         size_t n = input.size();
         const scalar_t* in_ptr = input.data();
         scalar_t* mask_ptr = mask_.data();
         scalar_t* out_ptr = output_.data();
 
-        for (size_t i = 0; i < n; ++i) {
-            if (dist(gen_) > ratio_) {
-                mask_ptr[i] = scale;
-            } else {
-                mask_ptr[i] = 0.0f;
+        #pragma omp parallel
+        {
+            int tid = omp_get_thread_num();
+            std::mt19937& local_gen = thread_gens_[tid];
+            std::uniform_real_distribution<scalar_t> dist(0.0f, 1.0f);
+
+            #pragma omp for
+            for (size_t i = 0; i < n; ++i) {
+                if (dist(local_gen) > ratio_) {
+                    mask_ptr[i] = scale;
+                } else {
+                    mask_ptr[i] = 0.0f;
+                }
+                out_ptr[i] = in_ptr[i] * mask_ptr[i];
             }
-            out_ptr[i] = in_ptr[i] * mask_ptr[i];
         }
 
         return output_;
@@ -69,6 +82,7 @@ public:
         const scalar_t* mask_ptr = mask_.data();
         scalar_t* in_grad_ptr = grad_input_.data();
 
+        #pragma omp parallel for
         for (size_t i = 0; i < n; ++i) {
             in_grad_ptr[i] = grad_ptr[i] * mask_ptr[i];
         }
@@ -81,14 +95,17 @@ public:
     }
 
     void save(std::ostream& os) const override {
-        os << LAYER_NAME << " " << ratio_ << "\n";
+        uint32_t marker = make_marker(LAYER_MARKER);
+        os.write(reinterpret_cast<const char*>(&marker), sizeof(marker));
+        os.write(reinterpret_cast<const char*>(&ratio_), sizeof(ratio_));
     }
 
     void load(std::istream& is) override {
-        std::string type;
+        uint32_t marker;
         scalar_t r;
-        is >> type >> r;
-        if (type != LAYER_NAME) throw std::runtime_error("Arch mismatch in DropoutLayer: expected '" + std::string(LAYER_NAME) + "'");
+        is.read(reinterpret_cast<char*>(&marker), sizeof(marker));
+        is.read(reinterpret_cast<char*>(&r), sizeof(r));
+        if (marker != make_marker(LAYER_MARKER)) throw std::runtime_error("Arch mismatch in DropoutLayer binary load");
         ratio_ = r;
     }
 

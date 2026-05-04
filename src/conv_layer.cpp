@@ -175,30 +175,19 @@ void ConvLayer::clear_gradients() {
 
 void ConvLayer::save(std::ostream& os) const {
     const size_t f_count = filters_matrix_.rows();
-    const size_t weights_per_filter = filters_matrix_.cols();
-    os << LAYER_NAME << " " << f_count << " " << kernel_size_ << "\n";
-    for (size_t f = 0; f < f_count; ++f) {
-        os << biases_(f, 0) << "\n";
-        for (size_t i = 0; i < weights_per_filter; ++i) {
-            os << filters_matrix_(f, i) << (i == weights_per_filter - 1 ? "" : " ");
-        }
-        os << "\n";
-    }
+    os.write(reinterpret_cast<const char*>(&f_count), sizeof(f_count));
+    os.write(reinterpret_cast<const char*>(&kernel_size_), sizeof(kernel_size_));
+    biases_.save(os);
+    filters_matrix_.save(os);
 }
 
 void ConvLayer::load(std::istream& is) {
-    const size_t expected_f_count = filters_matrix_.rows();
-    const size_t expected_weights_per_filter = filters_matrix_.cols();
-    std::string type;
     size_t f_count, k_size;
-    is >> type >> f_count >> k_size;
-    if (type != LAYER_NAME || f_count != expected_f_count || k_size != kernel_size_) {
-        throw std::runtime_error("Invalid ConvLayer data in model file");
+    is.read(reinterpret_cast<char*>(&f_count), sizeof(f_count));
+    is.read(reinterpret_cast<char*>(&k_size), sizeof(k_size));
+    if (f_count != filters_matrix_.rows() || k_size != kernel_size_) {
+        throw std::runtime_error("Arch mismatch in ConvLayer load");
     }
-    for (size_t f = 0; f < f_count; ++f) {
-        is >> biases_(f, 0);
-        for (size_t i = 0; i < expected_weights_per_filter; ++i) {
-            is >> filters_matrix_(f, i);
-        }
-    }
+    biases_.load(is);
+    filters_matrix_.load(is);
 }

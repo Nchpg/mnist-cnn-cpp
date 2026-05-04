@@ -4,7 +4,14 @@
 #include "matrix.hpp"
 #include <vector>
 #include <memory>
+#include <cstring>
 #include <nlohmann/json.hpp>
+
+inline uint32_t make_marker(const char* s) {
+    uint32_t v;
+    std::memcpy(&v, s, 4);
+    return v;
+}
 
 struct Shape3D {
     size_t channels;

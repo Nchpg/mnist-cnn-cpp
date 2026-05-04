@@ -54,27 +54,19 @@ void DenseLayer::clear_gradients() {
 }
 
 void DenseLayer::save(std::ostream& os) const {
-    os << LAYER_NAME << " " << input_size_ << " " << output_size_ << "\n";
-    for (size_t output = 0; output < output_size_; output++) {
-        os << biases_(output, 0);
-        for (size_t input_index = 0; input_index < input_size_; input_index++) {
-            os << " " << weights_(output, input_index);
-        }
-        os << "\n";
-    }
+    os.write(reinterpret_cast<const char*>(&input_size_), sizeof(input_size_));
+    os.write(reinterpret_cast<const char*>(&output_size_), sizeof(output_size_));
+    weights_.save(os);
+    biases_.save(os);
 }
 
 void DenseLayer::load(std::istream& is) {
-    std::string type;
-    size_t in_size = 0, out_size = 0;
-    is >> type >> in_size >> out_size;
-    if (type != LAYER_NAME || in_size != input_size_ || out_size != output_size_) {
-        throw std::runtime_error("Invalid DenseLayer data: expected '" + std::string(LAYER_NAME) + "'");
+    size_t in_size, out_size;
+    is.read(reinterpret_cast<char*>(&in_size), sizeof(in_size));
+    is.read(reinterpret_cast<char*>(&out_size), sizeof(out_size));
+    if (in_size != input_size_ || out_size != output_size_) {
+        throw std::runtime_error("Arch mismatch in DenseLayer load");
     }
-    for (size_t output = 0; output < output_size_; output++) {
-        is >> biases_(output, 0);
-        for (size_t input_index = 0; input_index < input_size_; input_index++) {
-            is >> weights_(output, input_index);
-        }
-    }
+    weights_.load(is);
+    biases_.load(is);
 }

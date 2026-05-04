@@ -9,7 +9,7 @@
 #include "batchnorm_layer.hpp"
 #include "mnist_dataset.hpp"
 #include "optimizer.hpp"
-#include "optimizer.hpp"
+#include "loss.hpp"
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -153,6 +153,7 @@ void CNN::train(MnistDataset& dataset, size_t epochs) {
     std::vector<size_t> batch_labels;
     Matrix grad_output;
     Matrix probs;
+    CrossEntropyLoss loss_fn;
 
     scalar_t final_loss = 0.0f;
     scalar_t final_acc = 0.0f;
@@ -162,45 +163,33 @@ void CNN::train(MnistDataset& dataset, size_t epochs) {
         size_t correct = 0;
         scalar_t total_loss = 0.0f;
         
-        size_t num_full_batches = total_samples / batch_size;
-        size_t samples_to_process = num_full_batches * batch_size;
+        size_t samples_to_process = (total_samples / batch_size) * batch_size;
 
         for (size_t sample = 0; sample < samples_to_process; sample += batch_size) {
-            size_t actual_batch_size = batch_size;
-
-            dataset.get_batch_images(sample, actual_batch_size, batch_images);
-            dataset.get_batch_labels(sample, actual_batch_size, batch_labels);
+            dataset.get_batch_images(sample, batch_size, batch_images);
+            dataset.get_batch_labels(sample, batch_size, batch_labels);
 
             const Matrix& logits = model_.forward(batch_images);
 
-            if (probs.rows() != logits.rows() || probs.cols() != actual_batch_size) {
-                probs.reshape(logits.rows(), actual_batch_size);
+            if (probs.rows() != logits.rows() || probs.cols() != batch_size) {
+                probs.reshape(logits.rows(), batch_size);
             }
             Activation::softmax(logits, probs);
 
-            total_loss += Activation::cross_entropy_loss_stable(probs, batch_labels) * static_cast<scalar_t>(actual_batch_size);
+            total_loss += loss_fn.forward(probs, batch_labels) * static_cast<scalar_t>(batch_size);
 
             auto predictions = Activation::argmax(logits);
-            for (size_t b = 0; b < actual_batch_size; ++b) {
+            for (size_t b = 0; b < batch_size; ++b) {
                 if (predictions[b] == batch_labels[b]) correct++;
             }
 
-            if (grad_output.rows() != logits.rows() || grad_output.cols() != actual_batch_size) {
-                grad_output.reshape(logits.rows(), actual_batch_size);
-            }
-            scalar_t inv_batch_size = 1.0f / static_cast<scalar_t>(actual_batch_size);
-            for (size_t b = 0; b < actual_batch_size; ++b) {
-                for (size_t i = 0; i < logits.rows(); i++) {
-                    scalar_t target = (i == batch_labels[b] ? 1.0f : 0.0f);
-                    grad_output(i, b) = (probs(i, b) - target) * inv_batch_size;
-                }
-            }
+            loss_fn.backward(probs, batch_labels, grad_output);
             
             model_.backward(grad_output);
             model_.step();
             model_.clear_gradients();
             
-            scalar_t progress = static_cast<scalar_t>(sample + actual_batch_size) / static_cast<scalar_t>(samples_to_process);
+            scalar_t progress = static_cast<scalar_t>(sample + batch_size) / static_cast<scalar_t>(samples_to_process);
             std::cout << "\rEpoch " << epoch + 1 << "/" << epochs << " [";
             int pos = static_cast<int>(static_cast<scalar_t>(bar_width) * progress);
             for (int i = 0; i < bar_width; ++i) {
@@ -209,7 +198,7 @@ void CNN::train(MnistDataset& dataset, size_t epochs) {
                 else std::cout << " ";
             }
             std::cout << "] " << static_cast<int>(progress * 100.0f) << "% " 
-                    << (sample + actual_batch_size) << "/" << samples_to_process << " " << std::flush;
+                    << (sample + batch_size) << "/" << samples_to_process << " " << std::flush;
         }
         
         final_loss = total_loss / static_cast<scalar_t>(samples_to_process);
@@ -259,7 +248,7 @@ scalar_t CNN::accuracy(const MnistDataset& dataset) {
 }
 
 void CNN::save(const std::string& path) const {
-    std::ofstream file(path, std::ios::out | std::ios::trunc);
+    std::ofstream file(path, std::ios::binary | std::ios::trunc);
     if (!file.is_open()) throw std::runtime_error("Save failed");
     
     json header;
@@ -287,34 +276,42 @@ void CNN::save(const std::string& path) const {
     header["layers"] = layers_configs;
     header["history"] = history_;
 
-    file << MAGIC << "\n" << header.dump() << "\n";
-    file << MnistDataset::mean() << " " << MnistDataset::std() << " " << MnistDataset::normalize() << "\n";
+    std::string header_str = header.dump();
+    size_t header_len = header_str.length();
+    
+    file.write(MAGIC, 4);
+    file.write(reinterpret_cast<const char*>(&header_len), sizeof(header_len));
+    file.write(header_str.c_str(), header_len);
+    
+    file.write(reinterpret_cast<const char*>(&MnistDataset::mean_), sizeof(scalar_t));
+    file.write(reinterpret_cast<const char*>(&MnistDataset::std_), sizeof(scalar_t));
+    file.write(reinterpret_cast<const char*>(&MnistDataset::normalize_), sizeof(bool));
+    
     for (const auto& layer : model_.layers()) layer->save(file);
     file.close();
 }
 
 void CNN::load_from_model(const std::string& path) {
-    std::ifstream file(path, std::ios::in);
+    std::ifstream file(path, std::ios::binary);
     if (!file.is_open()) throw std::runtime_error("Load failed: " + path);
     
-    std::string magic; 
-    std::getline(file, magic);
-    if (!magic.empty() && magic.back() == '\r') magic.pop_back();
-
-    if (magic != MAGIC) {
-        throw std::runtime_error("Unsupported model format or bad magic: " + magic);
+    char magic[4];
+    file.read(magic, 4);
+    if (std::strncmp(magic, MAGIC, 4) != 0) {
+        throw std::runtime_error("Unsupported model format or bad magic");
     }
 
-    std::string header_str;
-    std::getline(file, header_str);
+    size_t header_len;
+    file.read(reinterpret_cast<char*>(&header_len), sizeof(header_len));
+    std::string header_str(header_len, '\0');
+    file.read(&header_str[0], header_len);
+    
     json header = json::parse(header_str);
     build_from_json(header);
     
-    scalar_t mean, std; bool normalize;
-    file >> mean >> std >> normalize;
-    MnistDataset::mean_ = mean;
-    MnistDataset::std_ = std;
-    MnistDataset::normalize_ = normalize;
+    file.read(reinterpret_cast<char*>(&MnistDataset::mean_), sizeof(scalar_t));
+    file.read(reinterpret_cast<char*>(&MnistDataset::std_), sizeof(scalar_t));
+    file.read(reinterpret_cast<char*>(&MnistDataset::normalize_), sizeof(bool));
     
     for (auto& layer : model_.layers()) layer->load(file);
     file.close();

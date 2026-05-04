@@ -141,22 +141,23 @@ void BatchNormLayer::set_training(bool training) {
 }
 
 void BatchNormLayer::save(std::ostream& os) const {
-    os << LAYER_NAME << " " << channels_ << " " << spatial_size_ << "\n";
-    for (size_t c = 0; c < channels_; ++c) {
-        os << gamma_(c, 0) << " " << beta_(c, 0) << " "
-           << running_mean_(c, 0) << " " << running_var_(c, 0) << "\n";
-    }
+    os.write(reinterpret_cast<const char*>(&channels_), sizeof(channels_));
+    os.write(reinterpret_cast<const char*>(&spatial_size_), sizeof(spatial_size_));
+    os.write(reinterpret_cast<const char*>(gamma_.data()), channels_ * sizeof(scalar_t));
+    os.write(reinterpret_cast<const char*>(beta_.data()), channels_ * sizeof(scalar_t));
+    os.write(reinterpret_cast<const char*>(running_mean_.data()), channels_ * sizeof(scalar_t));
+    os.write(reinterpret_cast<const char*>(running_var_.data()), channels_ * sizeof(scalar_t));
 }
 
 void BatchNormLayer::load(std::istream& is) {
-    std::string type;
     size_t channels, spatial;
-    is >> type >> channels >> spatial;
-    if (type != LAYER_NAME || channels != channels_ || spatial != spatial_size_) {
-        throw std::runtime_error("Invalid BatchNormLayer data: expected '" + std::string(LAYER_NAME) + "'");
+    is.read(reinterpret_cast<char*>(&channels), sizeof(channels));
+    is.read(reinterpret_cast<char*>(&spatial), sizeof(spatial));
+    if (channels != channels_ || spatial != spatial_size_) {
+        throw std::runtime_error("Arch mismatch in BatchNormLayer load");
     }
-    for (size_t c = 0; c < channels_; ++c) {
-        is >> gamma_(c, 0) >> beta_(c, 0)
-           >> running_mean_(c, 0) >> running_var_(c, 0);
-    }
+    is.read(reinterpret_cast<char*>(gamma_.data()), channels_ * sizeof(scalar_t));
+    is.read(reinterpret_cast<char*>(beta_.data()), channels_ * sizeof(scalar_t));
+    is.read(reinterpret_cast<char*>(running_mean_.data()), channels_ * sizeof(scalar_t));
+    is.read(reinterpret_cast<char*>(running_var_.data()), channels_ * sizeof(scalar_t));
 }

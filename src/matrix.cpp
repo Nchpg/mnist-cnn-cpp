@@ -170,6 +170,22 @@ void Matrix::sum_columns(Matrix& out) const {
     }
 }
 
+void Matrix::save(std::ostream& os) const {
+    os.write(reinterpret_cast<const char*>(&rows_), sizeof(rows_));
+    os.write(reinterpret_cast<const char*>(&cols_), sizeof(cols_));
+    os.write(reinterpret_cast<const char*>(data_.data()), rows_ * cols_ * sizeof(scalar_t));
+}
+
+void Matrix::load(std::istream& is) {
+    size_t r, c;
+    is.read(reinterpret_cast<char*>(&r), sizeof(r));
+    is.read(reinterpret_cast<char*>(&c), sizeof(c));
+    if (r != rows_ || c != cols_) {
+        throw std::runtime_error("Matrix dimension mismatch during load");
+    }
+    is.read(reinterpret_cast<char*>(data_.data()), r * c * sizeof(scalar_t));
+}
+
 std::ostream& operator<<(std::ostream& os, const Matrix& m) {
     for (size_t i = 0; i < m.rows_; ++i) {
         for (size_t j = 0; j < m.cols_; ++j) {

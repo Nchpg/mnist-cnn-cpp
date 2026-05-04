@@ -8,7 +8,7 @@
 
 class PoolingLayer : public Layer {
 public:
-    static constexpr const char* LAYER_NAME = "POOL";
+    static constexpr const char* LAYER_MARKER = "POOL";
 
 private:
     size_t pool_size_;
@@ -30,15 +30,20 @@ public:
     const Matrix& backward(const Matrix& gradient) override;
 
     void save(std::ostream& os) const override {
-        os << LAYER_NAME << " " << pool_size_ << " " << stride_ << "\n";
+        uint32_t marker = make_marker(LAYER_MARKER);
+        os.write(reinterpret_cast<const char*>(&marker), sizeof(marker));
+        os.write(reinterpret_cast<const char*>(&pool_size_), sizeof(pool_size_));
+        os.write(reinterpret_cast<const char*>(&stride_), sizeof(stride_));
     }
 
     void load(std::istream& is) override {
-        std::string type;
+        uint32_t marker;
         size_t s, st;
-        is >> type >> s >> st;
-        if (type != LAYER_NAME || s != pool_size_ || st != stride_) {
-            throw std::runtime_error("Invalid PoolingLayer data");
+        is.read(reinterpret_cast<char*>(&marker), sizeof(marker));
+        is.read(reinterpret_cast<char*>(&s), sizeof(s));
+        is.read(reinterpret_cast<char*>(&st), sizeof(st));
+        if (marker != make_marker(LAYER_MARKER) || s != pool_size_ || st != stride_) {
+            throw std::runtime_error("Invalid PoolingLayer data in binary load");
         }
     }
 
