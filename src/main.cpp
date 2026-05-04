@@ -42,6 +42,8 @@ int main(int argc, char **argv) {
         scalar_t learning_rate = argc > 6 ? static_cast<scalar_t>(std::strtod(argv[6], nullptr)) : 0.01f;
 
         MnistDataset train = MnistDataset::load(argv[2], limit);
+        MnistDataset::compute_normalization(train.images());
+        train.apply_normalization();
         cnn.train(train, epochs, learning_rate);
         cnn.save(argv[3]);
         

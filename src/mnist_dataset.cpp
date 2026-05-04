@@ -6,6 +6,51 @@
 #include <cstdlib>
 #include <algorithm>
 #include <random>
+#include <cmath>
+#include <omp.h>
+
+scalar_t MnistDataset::mean_ = 0.0f;
+scalar_t MnistDataset::std_ = 1.0f;
+bool MnistDataset::normalize_ = false;
+
+void MnistDataset::compute_normalization(const std::vector<Matrix>& images) {
+    if (images.empty()) return;
+
+    size_t total = images.size();
+    scalar_t sum = 0.0f;
+
+    #pragma omp parallel for reduction(+:sum)
+    for (size_t i = 0; i < total; ++i) {
+        const Matrix& img = images[i];
+        for (size_t j = 0; j < PIXELS; ++j) {
+            sum += img(j, 0);
+        }
+    }
+    mean_ = sum / static_cast<scalar_t>(total * PIXELS);
+
+    scalar_t var_sum = 0.0f;
+    #pragma omp parallel for reduction(+:var_sum)
+    for (size_t i = 0; i < total; ++i) {
+        const Matrix& img = images[i];
+        for (size_t j = 0; j < PIXELS; ++j) {
+            scalar_t diff = img(j, 0) - mean_;
+            var_sum += diff * diff;
+        }
+    }
+    std_ = std::sqrt(var_sum / static_cast<scalar_t>(total * PIXELS));
+    normalize_ = true;
+}
+
+void MnistDataset::apply_normalization() {
+    if (!normalize_) return;
+
+    #pragma omp parallel for
+    for (size_t i = 0; i < count_; ++i) {
+        for (size_t j = 0; j < PIXELS; ++j) {
+            images_[i](j, 0) = (images_[i](j, 0) - mean_) / std_;
+        }
+    }
+}
 
 MnistDataset MnistDataset::load(const std::string& path, size_t limit) {
 
@@ -47,7 +92,8 @@ MnistDataset MnistDataset::load_bin(const std::string& path, size_t limit) {
 
         Matrix image(PIXELS, 1);
         for (size_t i = 0; i < PIXELS; ++i) {
-            image(i, 0) = static_cast<scalar_t>(pixels[i]) / 255.0f;
+            scalar_t raw = static_cast<scalar_t>(pixels[i]) / 255.0f;
+            image(i, 0) = normalize_ ? (raw - mean_) / std_ : raw;
         }
 
         dataset.images_.push_back(image);
@@ -140,7 +186,8 @@ Matrix MnistDataset::parse_pixels(const std::string& line, unsigned char& label)
         if (end == token.c_str() || pixel < 0 || pixel > 255) {
             throw std::runtime_error("Invalid MNIST pixel value: " + token + " at pixel index " + std::to_string(i));
         }
-        image(i, 0) = static_cast<scalar_t>(pixel) / 255.0f;
+        scalar_t raw = static_cast<scalar_t>(pixel) / 255.0f;
+        image(i, 0) = normalize_ ? (raw - mean_) / std_ : raw;
     }
     
     return image;

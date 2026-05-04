@@ -1,4 +1,5 @@
 #include "cnn.hpp"
+#include "mnist_dataset.hpp"
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -73,7 +74,8 @@ static bool parse_pixels(const std::string& body, Matrix& image) {
 
     for (size_t row = 0; row < 28; row++) {
         for (size_t col = 0; col < 28; col++) {
-            image(row * 28 + col, 0) = web_pixels[col * 28 + row] / 255.0f;
+            scalar_t raw = web_pixels[col * 28 + row] / 255.0f;
+            image(row * 28 + col, 0) = MnistDataset::normalize() ? (raw - MnistDataset::mean()) / MnistDataset::std() : raw;
         }
     }
     return true;

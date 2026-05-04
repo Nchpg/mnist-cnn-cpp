@@ -12,7 +12,8 @@ AUGMENT_TARGET := mnist_augment
 COMMON_SRC := src/cnn.cpp src/dense_layer.cpp \
                src/mnist_dataset.cpp src/matrix.cpp \
                src/pooling_layer.cpp \
-               src/conv_layer.cpp
+               src/conv_layer.cpp \
+               src/batchnorm_layer.cpp
 CLI_SRC := src/main.cpp $(COMMON_SRC)
 SERVER_SRC := src/server.cpp $(COMMON_SRC)
 AUGMENT_SRC := src/data_augmentation.cpp

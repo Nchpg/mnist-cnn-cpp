@@ -17,7 +17,7 @@ private:
     static constexpr size_t IMAGE_SIZE = 28;
     static constexpr size_t PIXELS = IMAGE_SIZE * IMAGE_SIZE;
     static constexpr size_t CLASSES = 10;
-    
+
     size_t count_ = 0;
     std::vector<Matrix> images_;
     std::vector<unsigned char> labels_;
@@ -29,6 +29,20 @@ private:
         while (pos < line.length() && std::isspace(line[pos])) pos++;
         return pos >= line.length() || !std::isdigit(line[pos]);
     }
+
+public:
+    static scalar_t mean_;
+    static scalar_t std_;
+    static bool normalize_;
+
+    static void compute_normalization(const std::vector<Matrix>& images);
+    void apply_normalization();
+
+    const std::vector<Matrix>& images() const { return images_; }
+
+    static scalar_t mean() { return mean_; }
+    static scalar_t std() { return std_; }
+    static bool normalize() { return normalize_; }
     
 public:
     MnistDataset() = default;

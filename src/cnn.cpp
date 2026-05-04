@@ -6,6 +6,8 @@
 #include "dense_layer.hpp"
 #include "flatten_layer.hpp"
 #include "dropout_layer.hpp"
+#include "batchnorm_layer.hpp"
+#include "mnist_dataset.hpp"
 #include "optimizer.hpp"
 #include "optimizer.hpp"
 #include <cstdlib>
@@ -75,6 +77,11 @@ CNN::CNN(const std::string& config_path, unsigned int seed, OptimizerType optimi
         else if (type == "Dropout") {
             scalar_t ratio = layer_def["ratio"];
             auto layer = std::make_unique<DropoutLayer>(ratio, gen_);
+            current_shape = layer->get_output_shape(current_shape);
+            model_.add(std::move(layer));
+        }
+        else if (type == "BatchNorm") {
+            auto layer = std::make_unique<BatchNormLayer>(current_shape.channels, current_shape.height * current_shape.width);
             current_shape = layer->get_output_shape(current_shape);
             model_.add(std::move(layer));
         }
@@ -194,6 +201,7 @@ void CNN::save(const std::string& path) const {
     std::ofstream file(path, std::ios::out | std::ios::trunc);
     if (!file.is_open()) throw std::runtime_error("Save failed");
     file << MAGIC << "\n" << model_.layers().size() << "\n";
+    file << MnistDataset::mean() << " " << MnistDataset::std() << " " << MnistDataset::normalize() << "\n";
     for (const auto& layer : model_.layers()) layer->save(file);
     file.close();
 }
@@ -205,6 +213,13 @@ void CNN::load(const std::string& path) {
     if (magic != MAGIC) throw std::runtime_error("Bad magic");
     size_t count; file >> count;
     if (count != model_.layers().size()) throw std::runtime_error("Arch mismatch");
+    scalar_t mean, std; bool normalize;
+    file >> mean >> std >> normalize;
+    if (normalize) {
+        MnistDataset::mean_ = mean;
+        MnistDataset::std_ = std;
+        MnistDataset::normalize_ = normalize;
+    }
     for (auto& layer : model_.layers()) layer->load(file);
     file.close();
 }
