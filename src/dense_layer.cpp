@@ -54,7 +54,7 @@ void DenseLayer::clear_gradients() {
 }
 
 void DenseLayer::save(std::ostream& os) const {
-    os << "DENSE " << input_size_ << " " << output_size_ << "\n";
+    os << LAYER_NAME << " " << input_size_ << " " << output_size_ << "\n";
     for (size_t output = 0; output < output_size_; output++) {
         os << biases_(output, 0);
         for (size_t input_index = 0; input_index < input_size_; input_index++) {
@@ -68,6 +68,9 @@ void DenseLayer::load(std::istream& is) {
     std::string type;
     size_t in_size = 0, out_size = 0;
     is >> type >> in_size >> out_size;
+    if (type != LAYER_NAME || in_size != input_size_ || out_size != output_size_) {
+        throw std::runtime_error("Invalid DenseLayer data: expected '" + std::string(LAYER_NAME) + "'");
+    }
     for (size_t output = 0; output < output_size_; output++) {
         is >> biases_(output, 0);
         for (size_t input_index = 0; input_index < input_size_; input_index++) {

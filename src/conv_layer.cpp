@@ -176,7 +176,7 @@ void ConvLayer::clear_gradients() {
 void ConvLayer::save(std::ostream& os) const {
     const size_t f_count = filters_matrix_.rows();
     const size_t weights_per_filter = filters_matrix_.cols();
-    os << "CONV " << f_count << " " << kernel_size_ << "\n";
+    os << LAYER_NAME << " " << f_count << " " << kernel_size_ << "\n";
     for (size_t f = 0; f < f_count; ++f) {
         os << biases_(f, 0) << "\n";
         for (size_t i = 0; i < weights_per_filter; ++i) {
@@ -192,7 +192,7 @@ void ConvLayer::load(std::istream& is) {
     std::string type;
     size_t f_count, k_size;
     is >> type >> f_count >> k_size;
-    if (type != "CONV" || f_count != expected_f_count || k_size != kernel_size_) {
+    if (type != LAYER_NAME || f_count != expected_f_count || k_size != kernel_size_) {
         throw std::runtime_error("Invalid ConvLayer data in model file");
     }
     for (size_t f = 0; f < f_count; ++f) {

@@ -7,6 +7,9 @@
 #include <vector>
 
 class PoolingLayer : public Layer {
+public:
+    static constexpr const char* LAYER_NAME = "POOL";
+
 private:
     size_t pool_size_;
     size_t stride_;
@@ -27,14 +30,14 @@ public:
     const Matrix& backward(const Matrix& gradient) override;
 
     void save(std::ostream& os) const override {
-        os << "POOL " << pool_size_ << " " << stride_ << "\n";
+        os << LAYER_NAME << " " << pool_size_ << " " << stride_ << "\n";
     }
-    
+
     void load(std::istream& is) override {
         std::string type;
         size_t s, st;
         is >> type >> s >> st;
-        if (type != "POOL" || s != pool_size_ || st != stride_) {
+        if (type != LAYER_NAME || s != pool_size_ || st != stride_) {
             throw std::runtime_error("Invalid PoolingLayer data");
         }
     }

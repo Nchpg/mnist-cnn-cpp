@@ -8,6 +8,9 @@
 
 class FlattenLayer : public Layer {
 public:
+    static constexpr const char* LAYER_NAME = "FLATTEN";
+
+public:
     FlattenLayer() = default;
     ~FlattenLayer() override = default;
 
@@ -23,13 +26,13 @@ public:
     }
 
     void save(std::ostream& os) const override {
-        os << "FLATTEN\n";
+        os << LAYER_NAME << "\n";
     }
 
     void load(std::istream& is) override {
         std::string type;
-        if (!(is >> type) || type != "FLATTEN") {
-            throw std::runtime_error("Invalid FlattenLayer data: expected 'FLATTEN'");
+        if (!(is >> type) || type != LAYER_NAME) {
+            throw std::runtime_error("Invalid FlattenLayer data: expected '" + std::string(LAYER_NAME) + "'");
         }
     }
 

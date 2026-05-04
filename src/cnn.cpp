@@ -122,6 +122,11 @@ void CNN::train(MnistDataset& dataset, size_t epochs, scalar_t learning_rate) {
     const size_t total_samples = dataset.count();
     const int bar_width = 30;
 
+    Matrix batch_images;
+    std::vector<size_t> batch_labels;
+    Matrix grad_output;
+    Matrix probs;
+
     for (size_t epoch = 0; epoch < epochs; epoch++) {
         dataset.shuffle_indices(); 
         size_t correct = 0;
@@ -132,13 +137,15 @@ void CNN::train(MnistDataset& dataset, size_t epochs, scalar_t learning_rate) {
 
         for (size_t sample = 0; sample < samples_to_process; sample += batch_size) {
             size_t actual_batch_size = batch_size;
-            
-            Matrix batch_images = dataset.get_batch_images(sample, actual_batch_size);
-            std::vector<size_t> batch_labels = dataset.get_batch_labels(sample, actual_batch_size);
-            
+
+            dataset.get_batch_images(sample, actual_batch_size, batch_images);
+            dataset.get_batch_labels(sample, actual_batch_size, batch_labels);
+
             const Matrix& logits = model_.forward(batch_images);
 
-            Matrix probs(logits.rows(), actual_batch_size);
+            if (probs.rows() != logits.rows() || probs.cols() != actual_batch_size) {
+                probs.reshape(logits.rows(), actual_batch_size);
+            }
             Activation::softmax(logits, probs);
 
             total_loss += Activation::cross_entropy_loss_stable(probs, batch_labels) * static_cast<scalar_t>(actual_batch_size);
@@ -148,7 +155,9 @@ void CNN::train(MnistDataset& dataset, size_t epochs, scalar_t learning_rate) {
                 if (predictions[b] == batch_labels[b]) correct++;
             }
 
-            Matrix grad_output(logits.rows(), actual_batch_size);
+            if (grad_output.rows() != logits.rows() || grad_output.cols() != actual_batch_size) {
+                grad_output.reshape(logits.rows(), actual_batch_size);
+            }
             scalar_t inv_batch_size = 1.0f / static_cast<scalar_t>(actual_batch_size);
             for (size_t b = 0; b < actual_batch_size; ++b) {
                 for (size_t i = 0; i < logits.rows(); i++) {
@@ -182,14 +191,18 @@ scalar_t CNN::accuracy(const MnistDataset& dataset) {
     model_.set_training(false);
     size_t correct = 0;
     const size_t eval_batch_size = 64;
+
+    Matrix batch_images;
+    std::vector<size_t> batch_labels;
+
     for (size_t i = 0; i < dataset.count(); i += eval_batch_size) {
         size_t actual_batch_size = std::min(eval_batch_size, dataset.count() - i);
-        Matrix batch_images = dataset.get_batch_images(i, actual_batch_size);
-        std::vector<size_t> batch_labels = dataset.get_batch_labels(i, actual_batch_size);
-        
+        dataset.get_batch_images(i, actual_batch_size, batch_images);
+        dataset.get_batch_labels(i, actual_batch_size, batch_labels);
+
         const Matrix& logits = model_.forward(batch_images);
         auto predictions = Activation::argmax(logits);
-        
+
         for (size_t b = 0; b < actual_batch_size; ++b) {
             if (predictions[b] == batch_labels[b]) correct++;
         }

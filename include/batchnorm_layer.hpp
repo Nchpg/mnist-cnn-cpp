@@ -6,6 +6,9 @@
 #include <cstddef>
 
 class BatchNormLayer : public Layer {
+public:
+    static constexpr const char* LAYER_NAME = "BATCHNORM";
+
 private:
     size_t channels_;
     size_t spatial_size_;

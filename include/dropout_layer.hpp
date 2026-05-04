@@ -7,6 +7,9 @@
 #include <stdexcept>
 
 class DropoutLayer : public Layer {
+public:
+    static constexpr const char* LAYER_NAME = "DROPOUT";
+
 private:
     scalar_t ratio_;
     bool is_training_ = true;
@@ -34,7 +37,7 @@ public:
 
         std::uniform_real_distribution<scalar_t> dist(0.0f, 1.0f);
         scalar_t scale = 1.0f / (1.0f - ratio_);
-        
+
         size_t n = input.size();
         const scalar_t* in_ptr = input.data();
         scalar_t* mask_ptr = mask_.data();
@@ -78,14 +81,14 @@ public:
     }
 
     void save(std::ostream& os) const override {
-        os << "DROPOUT " << ratio_ << "\n";
+        os << LAYER_NAME << " " << ratio_ << "\n";
     }
 
     void load(std::istream& is) override {
         std::string type;
         scalar_t r;
         is >> type >> r;
-        if (type != "DROPOUT") throw std::runtime_error("Arch mismatch in DropoutLayer: expected 'DROPOUT'");
+        if (type != LAYER_NAME) throw std::runtime_error("Arch mismatch in DropoutLayer: expected '" + std::string(LAYER_NAME) + "'");
         ratio_ = r;
     }
 };

@@ -198,31 +198,29 @@ void MnistDataset::shuffle_indices() {
 }
 
 
-Matrix MnistDataset::get_batch_images(size_t start_idx, size_t batch_size) const {
+void MnistDataset::get_batch_images(size_t start_idx, size_t batch_size, Matrix& out_batch) const {
     if (start_idx + batch_size > count_) {
-        batch_size = count_ - start_idx; 
+        batch_size = count_ - start_idx;
     }
-    Matrix batch(PIXELS, batch_size);
+    if (out_batch.rows() != PIXELS || out_batch.cols() != batch_size) {
+        out_batch.reshape(PIXELS, batch_size);
+    }
     for (size_t b = 0; b < batch_size; ++b) {
-
-        const Matrix& img = images_[indices_[start_idx + b]]; 
+        const Matrix& img = images_[indices_[start_idx + b]];
         for (size_t i = 0; i < PIXELS; ++i) {
-            batch(i, b) = img(i, 0);
+            out_batch(i, b) = img(i, 0);
         }
     }
-    return batch;
 }
 
 
-std::vector<size_t> MnistDataset::get_batch_labels(size_t start_idx, size_t batch_size) const {
+void MnistDataset::get_batch_labels(size_t start_idx, size_t batch_size, std::vector<size_t>& out_labels) const {
     if (start_idx + batch_size > count_) {
-        batch_size = count_ - start_idx; 
+        batch_size = count_ - start_idx;
     }
-    std::vector<size_t> batch(batch_size);
+    out_labels.resize(batch_size);
     for (size_t b = 0; b < batch_size; ++b) {
-
-        batch[b] = static_cast<size_t>(labels_[indices_[start_idx + b]]); 
+        out_labels[b] = static_cast<size_t>(labels_[indices_[start_idx + b]]);
     }
-    return batch;
 }
 

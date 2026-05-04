@@ -63,10 +63,10 @@ public:
     }
     
     void shuffle_indices();
-    
-    Matrix get_batch_images(size_t start_idx, size_t batch_size) const;
-    std::vector<size_t> get_batch_labels(size_t start_idx, size_t batch_size) const;
-    
+
+    void get_batch_images(size_t start_idx, size_t batch_size, Matrix& out_batch) const;
+    void get_batch_labels(size_t start_idx, size_t batch_size, std::vector<size_t>& out_labels) const;
+
 
 };
 

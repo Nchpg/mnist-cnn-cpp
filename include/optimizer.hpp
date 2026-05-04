@@ -90,7 +90,7 @@ public:
                 mw_ptr[j] = beta1_ * mw_ptr[j] + (1.0f - beta1_) * wg_ptr[j];
                 vw_ptr[j] = beta2_ * vw_ptr[j] + (1.0f - beta2_) * wg_ptr[j] * wg_ptr[j];
                 scalar_t m_hat = mw_ptr[j] * m_corr;
-                scalar_t v_hat = vw_ptr[j] * v_corr;
+                scalar_t v_hat = std::max(0.0f, vw_ptr[j] * v_corr);
                 w_ptr[j] -= learning_rate() * m_hat / (std::sqrt(v_hat) + epsilon_);
             }
         }

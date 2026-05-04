@@ -30,8 +30,9 @@ namespace Activation {
                 probs(i, j) = std::exp(logits(i, j) - max_val);
                 sum += probs(i, j);
             }
+            scalar_t inv_sum = 1.0f / sum;
             for (size_t i = 0; i < num_rows; ++i) {
-                probs(i, j) /= sum;
+                probs(i, j) *= inv_sum;
             }
         }
     }

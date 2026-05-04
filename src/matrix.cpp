@@ -3,8 +3,8 @@
 #include <stdexcept>
 #include <omp.h>
 
-Matrix::Matrix(size_t rows, size_t cols, scalar_t initial_val) 
-    : rows_(rows), cols_(cols), data_(rows * cols, initial_val) {}
+Matrix::Matrix(size_t rows, size_t cols, scalar_t initial_val)
+    : rows_(rows), cols_(cols), capacity_(rows * cols), data_(rows * cols, initial_val) {}
 
 scalar_t& Matrix::at(size_t r, size_t r_idx) {
     return (*this)(r, r_idx);
@@ -15,18 +15,24 @@ const scalar_t& Matrix::at(size_t r, size_t c) const {
 }
 
 void Matrix::fill(scalar_t value) noexcept {
-    std::fill(data_.begin(), data_.end(), value);
+    size_t n = rows_ * cols_;
+    std::fill(data_.begin(), data_.begin() + n, value);
 }
 
 void Matrix::random_uniform(scalar_t scale, std::mt19937& gen) {
     std::uniform_real_distribution<scalar_t> dist(-scale, scale);
-    for (scalar_t& val : data_) val = dist(gen);
+    size_t n = rows_ * cols_;
+    for (size_t i = 0; i < n; ++i) data_[i] = dist(gen);
 }
 
 void Matrix::reshape(size_t rows, size_t cols) {
+    size_t new_size = rows * cols;
     rows_ = rows;
     cols_ = cols;
-    data_.resize(rows * cols, 0.0f);
+    if (new_size > capacity_) {
+        capacity_ = new_size;
+        data_.resize(new_size, 0.0f);
+    }
 }
 
 void Matrix::multiply(const Matrix& A, const Matrix& B, Matrix& C) {
@@ -98,17 +104,23 @@ void Matrix::transpose(const Matrix& m, Matrix& out) {
 }
 
 Matrix& Matrix::operator+=(const Matrix& other) {
-    for (size_t i = 0; i < data_.size(); ++i) data_[i] += other.data_[i];
+    size_t n = rows_ * cols_;
+    #pragma omp simd
+    for (size_t i = 0; i < n; ++i) data_[i] += other.data_[i];
     return *this;
 }
 
 Matrix& Matrix::operator-=(const Matrix& other) {
-    for (size_t i = 0; i < data_.size(); ++i) data_[i] -= other.data_[i];
+    size_t n = rows_ * cols_;
+    #pragma omp simd
+    for (size_t i = 0; i < n; ++i) data_[i] -= other.data_[i];
     return *this;
 }
 
 void Matrix::add_scaled(const Matrix& other, scalar_t scale) {
-    for (size_t i = 0; i < data_.size(); ++i) data_[i] += other.data_[i] * scale;
+    size_t n = rows_ * cols_;
+    #pragma omp simd
+    for (size_t i = 0; i < n; ++i) data_[i] += other.data_[i] * scale;
 }
 
 void Matrix::add_outer_product(const Matrix& left, const Matrix& right) {
@@ -123,7 +135,9 @@ void Matrix::add_outer_product(const Matrix& left, const Matrix& right) {
 }
 
 void Matrix::subtract_scaled(const Matrix& grad, scalar_t scale) {
-    for (size_t i = 0; i < data_.size(); ++i) data_[i] -= grad.data_[i] * scale;
+    size_t n = rows_ * cols_;
+    #pragma omp simd
+    for (size_t i = 0; i < n; ++i) data_[i] -= grad.data_[i] * scale;
 }
 
 void Matrix::add_broadcast(const Matrix& vec) {

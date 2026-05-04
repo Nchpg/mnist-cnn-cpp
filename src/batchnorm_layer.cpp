@@ -56,8 +56,13 @@ const Matrix& BatchNormLayer::forward(const Matrix& input) {
             }
             saved_var_(c, 0) = var_sum / N;
 
+            scalar_t corrected_var = saved_var_(c, 0);
+            if (N > 1) {
+                corrected_var = saved_var_(c, 0) * N / (N - 1.0f);
+            }
+
             running_mean_(c, 0) = momentum_ * running_mean_(c, 0) + (1.0f - momentum_) * saved_mean_(c, 0);
-            running_var_(c, 0) = momentum_ * running_var_(c, 0) + (1.0f - momentum_) * saved_var_(c, 0);
+            running_var_(c, 0) = momentum_ * running_var_(c, 0) + (1.0f - momentum_) * corrected_var;
         }
 
         scalar_t mean_to_use = is_training_ ? saved_mean_(c, 0) : running_mean_(c, 0);
@@ -136,7 +141,7 @@ void BatchNormLayer::set_training(bool training) {
 }
 
 void BatchNormLayer::save(std::ostream& os) const {
-    os << "BATCHNORM " << channels_ << " " << spatial_size_ << "\n";
+    os << LAYER_NAME << " " << channels_ << " " << spatial_size_ << "\n";
     for (size_t c = 0; c < channels_; ++c) {
         os << gamma_(c, 0) << " " << beta_(c, 0) << " "
            << running_mean_(c, 0) << " " << running_var_(c, 0) << "\n";
@@ -147,6 +152,9 @@ void BatchNormLayer::load(std::istream& is) {
     std::string type;
     size_t channels, spatial;
     is >> type >> channels >> spatial;
+    if (type != LAYER_NAME || channels != channels_ || spatial != spatial_size_) {
+        throw std::runtime_error("Invalid BatchNormLayer data: expected '" + std::string(LAYER_NAME) + "'");
+    }
     for (size_t c = 0; c < channels_; ++c) {
         is >> gamma_(c, 0) >> beta_(c, 0)
            >> running_mean_(c, 0) >> running_var_(c, 0);

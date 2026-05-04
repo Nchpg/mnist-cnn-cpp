@@ -12,12 +12,18 @@ class Matrix {
 private:
     size_t rows_ = 0;
     size_t cols_ = 0;
+    size_t capacity_ = 0;
     std::vector<scalar_t> data_;
 
 public:
 
     Matrix() = default;
     Matrix(size_t rows, size_t cols, scalar_t initial_val = 0.0f);
+
+    Matrix(const Matrix&) = default;
+    Matrix& operator=(const Matrix&) = default;
+    Matrix(Matrix&&) noexcept = default;
+    Matrix& operator=(Matrix&&) noexcept = default;
 
 
     inline scalar_t& operator()(size_t r, size_t c) { return data_[r * cols_ + c]; }
@@ -30,7 +36,7 @@ public:
 
     size_t rows() const noexcept { return rows_; }
     size_t cols() const noexcept { return cols_; }
-    size_t size() const noexcept { return data_.size(); }
+    size_t size() const noexcept { return rows_ * cols_; }
     const std::vector<scalar_t>& get_raw_vector() const noexcept { return data_; }
     std::vector<scalar_t>& get_raw_vector() noexcept { return data_; }
     scalar_t* data() noexcept { return data_.data(); }

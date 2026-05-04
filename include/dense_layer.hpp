@@ -10,6 +10,9 @@
 #include <random>
 
 class DenseLayer : public Layer {
+public:
+    static constexpr const char* LAYER_NAME = "DENSE";
+
 private:
     size_t input_size_;
     size_t output_size_;

@@ -7,6 +7,9 @@
 #include <vector>
 #include <random>
 class ConvLayer : public Layer {
+public:
+    static constexpr const char* LAYER_NAME = "CONV";
+
 private:
     size_t kernel_size_;
     Matrix biases_;  
