@@ -42,6 +42,8 @@ public:
     void save(std::ostream& os) const override;
     void load(std::istream& is) override;
 
+    nlohmann::json get_config() const override { return {{"type", "BatchNorm"}}; }
+
     Shape3D get_output_shape(const Shape3D& input_shape) const override {
         return input_shape;
     }

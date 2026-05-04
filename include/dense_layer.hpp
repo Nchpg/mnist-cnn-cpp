@@ -43,6 +43,10 @@ public:
     void save(std::ostream& os) const override;
     void load(std::istream& is) override;
 
+    nlohmann::json get_config() const override {
+        return {{"type", "Dense"}, {"units", output_size_}};
+    }
+
     Shape3D get_output_shape(const Shape3D& /*input_shape*/) const override {
         return {output_size_, 1, 1};
     }

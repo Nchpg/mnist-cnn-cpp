@@ -160,8 +160,13 @@ static int create_server_socket(int port) {
 int main(int argc, char **argv) {
     std::string model_path = argc > 1 ? argv[1] : "mnist_cnn.model";
     int port = argc > 2 ? std::stoi(argv[2]) : DEFAULT_PORT;
-    CNN cnn("architecture.json", 42);
-    cnn.load(model_path);
+    CNN cnn;
+    try {
+        cnn.load_from_model(model_path);
+    } catch (const std::exception& e) {
+        std::cerr << "Failed to load model: " << e.what() << std::endl;
+        return 1;
+    }
     signal(SIGINT, handle_signal);
     int server_fd = create_server_socket(port);
     std::cout << "MNIST server on port " << port << std::endl;

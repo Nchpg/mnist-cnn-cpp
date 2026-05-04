@@ -58,6 +58,8 @@ public:
         if (type != LAYER_NAME) throw std::runtime_error("Architecture mismatch in ReluLayer");
     }
 
+    nlohmann::json get_config() const override { return {{"type", "ReLU"}}; }
+
     Shape3D get_output_shape(const Shape3D& input_shape) const override {
         return input_shape;
     }

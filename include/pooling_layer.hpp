@@ -42,6 +42,10 @@ public:
         }
     }
 
+    nlohmann::json get_config() const override {
+        return {{"type", "Pool"}, {"pool_size", pool_size_}, {"stride", stride_}};
+    }
+
     Shape3D get_output_shape(const Shape3D& input_shape) const override {
         return {input_shape.channels, (input_shape.height - pool_size_) / stride_ + 1, (input_shape.width - pool_size_) / stride_ + 1};
     }

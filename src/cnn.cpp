@@ -24,16 +24,43 @@
 
 using json = nlohmann::json;
 
-CNN::CNN(const std::string& config_path, unsigned int seed, OptimizerType optimizer_type, scalar_t learning_rate)
-    : model_(), gen_(seed), optimizer_type_(optimizer_type), learning_rate_(learning_rate) {
-    std::ifstream f(config_path);
-    json config_data = json::parse(f);
+CNN::CNN(unsigned int seed) : model_(), gen_(seed) {}
 
-    Shape3D current_shape = {
+void CNN::load_from_json(const std::string& config_path) {
+    std::ifstream f(config_path);
+    if (!f.is_open()) throw std::runtime_error("Could not open config file: " + config_path);
+    json config_data = json::parse(f);
+    build_from_json(config_data);
+}
+
+void CNN::build_from_json(const nlohmann::json& config_data) {
+    input_shape_ = {
         config_data["input_shape"]["channels"],
         config_data["input_shape"]["height"],
         config_data["input_shape"]["width"]
     };
+
+    if (config_data.contains("hyperparameters")) {
+        const auto& hp = config_data["hyperparameters"];
+        hp_.batch_size = hp.value("batch_size", 64);
+        
+        if (hp.contains("optimizer")) {
+            const auto& opt = hp["optimizer"];
+            std::string opt_type = opt.value("type", "Adam");
+            hp_.optimizer_type = (opt_type == "SGD") ? OptimizerType::SGD : OptimizerType::Adam;
+            hp_.learning_rate = opt.value("learning_rate", 0.001f);
+            hp_.beta1 = opt.value("beta1", 0.9f);
+            hp_.beta2 = opt.value("beta2", 0.999f);
+            hp_.epsilon = opt.value("epsilon", 1e-8f);
+        }
+    }
+
+    if (config_data.contains("history")) {
+        history_ = config_data["history"].get<std::vector<json>>();
+    }
+
+    Shape3D current_shape = input_shape_;
+    model_.layers().clear();
 
     for (const auto& layer_def : config_data["layers"]) {
         std::string type = layer_def["type"];
@@ -87,10 +114,10 @@ CNN::CNN(const std::string& config_path, unsigned int seed, OptimizerType optimi
         }
     }
 
-    if (optimizer_type_ == OptimizerType::SGD) {
-        model_.set_optimizer(std::make_unique<SGDOptimizer>(learning_rate));
+    if (hp_.optimizer_type == OptimizerType::SGD) {
+        model_.set_optimizer(std::make_unique<SGDOptimizer>(hp_.learning_rate));
     } else {
-        model_.set_optimizer(std::make_unique<AdamOptimizer>(learning_rate));
+        model_.set_optimizer(std::make_unique<AdamOptimizer>(hp_.learning_rate, hp_.beta1, hp_.beta2, hp_.epsilon));
     }
 }
 
@@ -112,13 +139,13 @@ int CNN::predict_label(const Matrix& image) {
     return static_cast<int>(results[0]);
 }
 
-void CNN::train(MnistDataset& dataset, size_t epochs, scalar_t learning_rate) {
+void CNN::train(MnistDataset& dataset, size_t epochs) {
     model_.set_training(true);
     if (model_.optimizer()) {
         model_.optimizer()->reset();
-        model_.optimizer()->set_learning_rate(learning_rate);
+        model_.optimizer()->set_learning_rate(hp_.learning_rate);
     }
-    const size_t batch_size = 64;
+    const size_t batch_size = hp_.batch_size;
     const size_t total_samples = dataset.count();
     const int bar_width = 30;
 
@@ -126,6 +153,9 @@ void CNN::train(MnistDataset& dataset, size_t epochs, scalar_t learning_rate) {
     std::vector<size_t> batch_labels;
     Matrix grad_output;
     Matrix probs;
+
+    scalar_t final_loss = 0.0f;
+    scalar_t final_acc = 0.0f;
 
     for (size_t epoch = 0; epoch < epochs; epoch++) {
         dataset.shuffle_indices(); 
@@ -182,9 +212,27 @@ void CNN::train(MnistDataset& dataset, size_t epochs, scalar_t learning_rate) {
                     << (sample + actual_batch_size) << "/" << samples_to_process << " " << std::flush;
         }
         
-        std::cout << "\n  -> loss: " << total_loss / static_cast<scalar_t>(samples_to_process)
-                  << " - accuracy: " << 100.0f * static_cast<scalar_t>(correct) / static_cast<scalar_t>(samples_to_process) << "%" << std::endl;
+        final_loss = total_loss / static_cast<scalar_t>(samples_to_process);
+        final_acc = 100.0f * static_cast<scalar_t>(correct) / static_cast<scalar_t>(samples_to_process);
+        std::cout << "\n  -> loss: " << final_loss << " - accuracy: " << final_acc << "%" << std::endl;
     }
+
+    json session;
+    session["samples"] = total_samples;
+    session["epochs"] = epochs;
+    session["final_loss"] = final_loss;
+    session["final_accuracy"] = final_acc;
+    session["hyperparameters"] = {
+        {"batch_size", hp_.batch_size},
+        {"optimizer", {
+            {"type", (hp_.optimizer_type == OptimizerType::SGD) ? "SGD" : "Adam"},
+            {"learning_rate", hp_.learning_rate},
+            {"beta1", hp_.beta1},
+            {"beta2", hp_.beta2},
+            {"epsilon", hp_.epsilon}
+        }}
+    };
+    history_.push_back(session);
 }
 
 scalar_t CNN::accuracy(const MnistDataset& dataset) {
@@ -213,26 +261,124 @@ scalar_t CNN::accuracy(const MnistDataset& dataset) {
 void CNN::save(const std::string& path) const {
     std::ofstream file(path, std::ios::out | std::ios::trunc);
     if (!file.is_open()) throw std::runtime_error("Save failed");
-    file << MAGIC << "\n" << model_.layers().size() << "\n";
+    
+    json header;
+    header["input_shape"] = {
+        {"channels", input_shape_.channels},
+        {"height", input_shape_.height},
+        {"width", input_shape_.width}
+    };
+    
+    header["hyperparameters"] = {
+        {"batch_size", hp_.batch_size},
+        {"optimizer", {
+            {"type", (hp_.optimizer_type == OptimizerType::SGD) ? "SGD" : "Adam"},
+            {"learning_rate", hp_.learning_rate},
+            {"beta1", hp_.beta1},
+            {"beta2", hp_.beta2},
+            {"epsilon", hp_.epsilon}
+        }}
+    };
+    
+    json layers_configs = json::array();
+    for (const auto& layer : model_.layers()) {
+        layers_configs.push_back(layer->get_config());
+    }
+    header["layers"] = layers_configs;
+    header["history"] = history_;
+
+    file << MAGIC << "\n" << header.dump() << "\n";
     file << MnistDataset::mean() << " " << MnistDataset::std() << " " << MnistDataset::normalize() << "\n";
     for (const auto& layer : model_.layers()) layer->save(file);
     file.close();
 }
 
-void CNN::load(const std::string& path) {
+void CNN::load_from_model(const std::string& path) {
     std::ifstream file(path, std::ios::in);
-    if (!file.is_open()) throw std::runtime_error("Load failed");
-    std::string magic; file >> magic;
-    if (magic != MAGIC) throw std::runtime_error("Bad magic");
-    size_t count; file >> count;
-    if (count != model_.layers().size()) throw std::runtime_error("Arch mismatch");
+    if (!file.is_open()) throw std::runtime_error("Load failed: " + path);
+    
+    std::string magic; 
+    std::getline(file, magic);
+    if (!magic.empty() && magic.back() == '\r') magic.pop_back();
+
+    if (magic != MAGIC) {
+        throw std::runtime_error("Unsupported model format or bad magic: " + magic);
+    }
+
+    std::string header_str;
+    std::getline(file, header_str);
+    json header = json::parse(header_str);
+    build_from_json(header);
+    
     scalar_t mean, std; bool normalize;
     file >> mean >> std >> normalize;
-    if (normalize) {
-        MnistDataset::mean_ = mean;
-        MnistDataset::std_ = std;
-        MnistDataset::normalize_ = normalize;
-    }
+    MnistDataset::mean_ = mean;
+    MnistDataset::std_ = std;
+    MnistDataset::normalize_ = normalize;
+    
     for (auto& layer : model_.layers()) layer->load(file);
     file.close();
+}
+
+void CNN::print_architecture() const {
+    std::cout << "CNN Architecture:\n";
+    std::cout << "  Input Shape: " << input_shape_.channels << "x" << input_shape_.height << "x" << input_shape_.width << "\n";
+    std::cout << "  Hyperparameters:\n";
+    std::cout << "    Batch Size: " << hp_.batch_size << "\n";
+    std::cout << "    Optimizer:\n";
+    std::cout << "      Type: " << (hp_.optimizer_type == OptimizerType::SGD ? "SGD" : "Adam") << "\n";
+    std::cout << "      Learning Rate: " << hp_.learning_rate << "\n";
+    if (hp_.optimizer_type == OptimizerType::Adam) {
+        std::cout << "      Adam Beta1: " << hp_.beta1 << "\n";
+        std::cout << "      Adam Beta2: " << hp_.beta2 << "\n";
+        std::cout << "      Adam Epsilon: " << hp_.epsilon << "\n";
+    }
+    std::cout << "  Layers:\n";
+    for (size_t i = 0; i < model_.layers().size(); ++i) {
+        std::cout << "    " << i + 1 << ". " << model_.layers()[i]->get_config().dump() << "\n";
+    }
+
+    if (!history_.empty()) {
+        std::cout << "  Training History:\n";
+        for (size_t i = 0; i < history_.size(); ++i) {
+            const auto& h = history_[i];
+            auto get_f = [](const json& j, const char* k) -> std::string {
+                if (j.contains(k) && j[k].is_number()) {
+                    std::ostringstream oss;
+                    oss << j[k].get<float>();
+                    return oss.str();
+                }
+                return "nan";
+            };
+
+            std::cout << "    Session " << i + 1 << ": "
+                      << h.value("samples", 0UL) << " samples, "
+                      << h.value("epochs", 0UL) << " epochs, "
+                      << "loss: " << get_f(h, "final_loss") << ", "
+                      << "acc: " << get_f(h, "final_accuracy") << "%\n";
+            
+            const auto& hp = h["hyperparameters"];
+            const auto& opt = hp["optimizer"];
+            
+            std::cout << "      Batch Size: " << hp.value("batch_size", 0UL) << "\n"
+                      << "      Optimizer: " << opt.value("type", "Unknown") 
+                      << " (lr=" << get_f(opt, "learning_rate");
+            
+            if (opt.value("type", "Adam") == "Adam") {
+                std::cout << ", beta1=" << get_f(opt, "beta1")
+                          << ", beta2=" << get_f(opt, "beta2")
+                          << ", eps=" << get_f(opt, "epsilon");
+            }
+            std::cout << ")\n";
+        }
+    }
+}
+
+void CNN::set_hyperparameters(const Hyperparameters& hp) {
+    hp_ = hp;
+    if (hp_.optimizer_type == OptimizerType::SGD) {
+        model_.set_optimizer(std::make_unique<SGDOptimizer>(hp_.learning_rate));
+    } else {
+        model_.set_optimizer(std::make_unique<AdamOptimizer>(hp_.learning_rate, hp_.beta1, hp_.beta2, hp_.epsilon));
+    }
 }

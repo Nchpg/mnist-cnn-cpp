@@ -36,6 +36,8 @@ public:
         }
     }
 
+    nlohmann::json get_config() const override { return {{"type", "Flatten"}}; }
+
     Shape3D get_output_shape(const Shape3D& input_shape) const override {
         return {input_shape.size(), 1, 1};
     }

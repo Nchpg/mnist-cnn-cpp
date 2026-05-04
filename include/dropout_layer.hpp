@@ -91,6 +91,8 @@ public:
         if (type != LAYER_NAME) throw std::runtime_error("Arch mismatch in DropoutLayer: expected '" + std::string(LAYER_NAME) + "'");
         ratio_ = r;
     }
+
+    nlohmann::json get_config() const override { return {{"type", "Dropout"}, {"ratio", ratio_}}; }
 };
 
 #endif

@@ -4,6 +4,7 @@
 #include "matrix.hpp"
 #include <vector>
 #include <memory>
+#include <nlohmann/json.hpp>
 
 struct Shape3D {
     size_t channels;
@@ -31,6 +32,8 @@ virtual const Matrix& forward(const Matrix& input) = 0;
 
     virtual void save(std::ostream& /*os*/) const {}
     virtual void load(std::istream& /*is*/) {}
+
+    virtual nlohmann::json get_config() const = 0;
 
     virtual Shape3D get_output_shape(const Shape3D& input_shape) const = 0;
 };

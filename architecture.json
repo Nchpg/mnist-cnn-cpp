@@ -1,5 +1,15 @@
 {
   "input_shape": {"channels": 1, "height": 28, "width": 28},
+  "hyperparameters": {
+    "batch_size": 64,
+    "optimizer": {
+      "type": "Adam",
+      "learning_rate": 0.001,
+      "beta1": 0.9,
+      "beta2": 0.999,
+      "epsilon": 1e-08
+    }
+  },
   "layers": [
     {"type": "Conv", "filters": 32, "kernel_size": 3},
     {"type": "BatchNorm"},

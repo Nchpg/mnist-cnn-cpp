@@ -42,6 +42,10 @@ public:
     void save(std::ostream& os) const override;
     void load(std::istream& is) override;
 
+    nlohmann::json get_config() const override {
+        return {{"type", "Conv"}, {"filters", filters_matrix_.rows()}, {"kernel_size", kernel_size_}};
+    }
+
     Shape3D get_output_shape(const Shape3D& input_shape) const override {
         return {filters_matrix_.rows(), input_shape.height - kernel_size_ + 1, input_shape.width - kernel_size_ + 1};
     }
