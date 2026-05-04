@@ -1,5 +1,7 @@
 CC := g++
-CFLAGS := -std=c++17 -Wall -Wextra -Wpedantic -fopenmp -Iinclude -MMD -MP -O3 -march=native
+CFLAGS_COMMON := -std=c++17 -Wall -Wextra -Wpedantic -fopenmp -Iinclude -MMD -MP -O3 -march=native
+CFLAGS_DEBUG := $(CFLAGS_COMMON) -g -Og -fsanitize=address -fsanitize=undefined
+CFLAGS := $(CFLAGS_COMMON)
 LDLIBS := -lm -fopenmp
 
 OPENCV_CFLAGS := $(shell pkg-config --cflags opencv4 2>/dev/null || pkg-config --cflags opencv)
@@ -24,10 +26,12 @@ AUGMENT_OBJ := $(AUGMENT_SRC:.cpp=.o)
 
 DEP := $(CLI_OBJ:.o=.d) $(SERVER_OBJ:.o=.d) $(AUGMENT_OBJ:.o=.d)
 
-.PHONY: all clean
+.PHONY: all clean debug
 
-# Compile désormais les 3 exécutables
 all: $(TARGET) $(SERVER_TARGET) $(AUGMENT_TARGET)
+
+debug: CFLAGS = $(CFLAGS_DEBUG)
+debug: clean all
 
 $(TARGET): $(CLI_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS)

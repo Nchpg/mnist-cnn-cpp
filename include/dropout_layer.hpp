@@ -17,15 +17,11 @@ private:
     Matrix mask_;
     Matrix output_;
     Matrix grad_input_;
-    std::mt19937& gen_;
-    std::vector<std::mt19937> thread_gens_;
+    inline static thread_local std::mt19937 local_gen_;
 
 public:
-    DropoutLayer(scalar_t ratio, std::mt19937& gen) : ratio_(ratio), gen_(gen) {
-        int max_threads = omp_get_max_threads();
-        for (int i = 0; i < max_threads; ++i) {
-            thread_gens_.emplace_back(gen());
-        }
+    DropoutLayer(scalar_t ratio, std::mt19937& gen) : ratio_(ratio) {
+        local_gen_ = gen;
     }
 
     void set_training(bool training) override {
@@ -50,8 +46,7 @@ public:
 
         #pragma omp parallel
         {
-            int tid = omp_get_thread_num();
-            std::mt19937& local_gen = thread_gens_[tid];
+            std::mt19937& local_gen = local_gen_;
             std::uniform_real_distribution<scalar_t> dist(0.0f, 1.0f);
 
             #pragma omp for

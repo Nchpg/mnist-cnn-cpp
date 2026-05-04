@@ -29,8 +29,8 @@ public:
         scalar_t inv_batch_size = 1.0f / static_cast<scalar_t>(batch_size);
 
         #pragma omp parallel for collapse(2) if(num_classes * batch_size > 1000)
-        for (size_t b = 0; b < batch_size; ++b) {
-            for (size_t i = 0; i < num_classes; ++i) {
+        for (size_t i = 0; i < num_classes; ++i) {
+            for (size_t b = 0; b < batch_size; ++b) {
                 scalar_t target = (i == targets[b] ? 1.0f : 0.0f);
                 grad_output(i, b) = (predictions(i, b) - target) * inv_batch_size;
             }

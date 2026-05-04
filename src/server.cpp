@@ -1,5 +1,6 @@
 #include "cnn.hpp"
 #include "mnist_dataset.hpp"
+#include "constants.hpp"
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -64,25 +65,25 @@ static bool parse_pixels(const std::string& body, Matrix& image) {
         try {
             scalar_t pixel = static_cast<scalar_t>(std::stod(token));
             web_pixels.push_back(pixel);
-            if (web_pixels.size() == 28 * 28) break;
+            if (web_pixels.size() == PIXELS) break;
         } catch (...) {
             return false;
         }
     }
-    
-    if (web_pixels.size() != 28 * 28) return false;
 
-    for (size_t row = 0; row < 28; row++) {
-        for (size_t col = 0; col < 28; col++) {
-            scalar_t raw = web_pixels[col * 28 + row] / 255.0f;
-            image(row * 28 + col, 0) = MnistDataset::normalize() ? (raw - MnistDataset::mean()) / MnistDataset::std() : raw;
+    if (web_pixels.size() != PIXELS) return false;
+
+    for (size_t row = 0; row < IMG_HEIGHT; row++) {
+        for (size_t col = 0; col < IMG_WIDTH; col++) {
+            scalar_t raw = web_pixels[col * IMG_HEIGHT + row] / NORMALIZE_DIVISOR;
+            image(row * IMG_HEIGHT + col, 0) = MnistDataset::normalize() ? (raw - MnistDataset::mean()) / MnistDataset::std() : raw;
         }
     }
     return true;
 }
 
 static void handle_predict(int client_fd, CNN& cnn, const std::string& body) {
-    Matrix image(28 * 28, 1);
+    Matrix image(PIXELS, 1);
     if (!parse_pixels(body, image)) {
         send_response(client_fd, "400 Bad Request", "text/plain", "malformed pixels\n");
         return;

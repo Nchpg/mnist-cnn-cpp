@@ -6,25 +6,27 @@
 #include <random>
 #include <opencv2/opencv.hpp>
 
+#include "constants.hpp"
+
 using namespace std;
 using namespace cv;
 
 bool parseCSVLine(const string& line, uint8_t& label, Mat& image) {
     stringstream ss(line);
     string val;
-    
+
     if (!getline(ss, val, ',')) return false;
     label = static_cast<uint8_t>(stoi(val));
 
-    image = Mat(28, 28, CV_8UC1);
+    image = Mat(IMG_HEIGHT, IMG_WIDTH, CV_8UC1);
     int i = 0;
     while (getline(ss, val, ',')) {
-        if (i < 784) {
-            image.at<uint8_t>(i / 28, i % 28) = static_cast<uint8_t>(stoi(val));
+        if (i < static_cast<int>(PIXELS)) {
+            image.at<uint8_t>(i / IMG_WIDTH, i % IMG_WIDTH) = static_cast<uint8_t>(stoi(val));
             i++;
         }
     }
-    return i == 784;
+    return i == static_cast<int>(PIXELS);
 }
 
 Mat augmentImage(const Mat& input, mt19937& gen) {

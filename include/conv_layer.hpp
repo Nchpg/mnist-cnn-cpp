@@ -22,8 +22,9 @@ private:
     Matrix filters_matrix_; 
     Matrix filters_grad_matrix_;
 
-    Matrix im2col_buffer_;  
-    Matrix gemm_out_;       
+    Matrix im2col_buffer_;
+    Matrix gemm_out_;
+    Matrix grad_col_buffer_;       
 
     void im2col(const Matrix& input, Matrix& out_col);
     void col2im(const Matrix& grad_col, TensorBatch& grad_input);

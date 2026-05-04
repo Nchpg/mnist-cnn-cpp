@@ -74,9 +74,9 @@ const Matrix& PoolingLayer::backward(const Matrix& gradient) {
     size_t batch_size = output_.batch_size();
     size_t num_out_rows = output_.rows();
 
-    #pragma omp parallel for if(num_out_rows > 100)
-    for (size_t r = 0; r < num_out_rows; ++r) {
-        for (size_t b = 0; b < batch_size; ++b) {
+    #pragma omp parallel for if(batch_size > 1)
+    for (size_t b = 0; b < batch_size; ++b) {
+        for (size_t r = 0; r < num_out_rows; ++r) {
             size_t max_in_row = argmax_indices_[r * batch_size + b];
             scalar_t grad_val = gradient(r, b);
             grad_input_(max_in_row, b) += grad_val;

@@ -1,8 +1,8 @@
 #pragma once
 
 #include <vector>
-#include <iostream>
 #include <random>
+#include <cstdint>
 
 
 
@@ -18,6 +18,7 @@ private:
 public:
 
     Matrix() = default;
+    virtual ~Matrix() = default;
     Matrix(size_t rows, size_t cols, scalar_t initial_val = 0.0f);
 
     Matrix(const Matrix&) = default;
@@ -57,7 +58,6 @@ public:
     static void multiply_transB(const Matrix& A, const Matrix& B, Matrix& C); 
     static void transpose(const Matrix& m, Matrix& out);
     void add_scaled(const Matrix& other, scalar_t scale);
-    void add_outer_product(const Matrix& left, const Matrix& right);
     void subtract_scaled(const Matrix& grad, scalar_t scale);
     void add_broadcast(const Matrix& vec);
     void sum_columns(Matrix& out) const;

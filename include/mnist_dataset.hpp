@@ -2,6 +2,7 @@
 #define MNIST_DATASET_HPP
 
 #include "matrix.hpp"
+#include "constants.hpp"
 #include <vector>
 #include <string>
 #include <stdexcept>
@@ -10,16 +11,12 @@
 #include <cctype>
 #include <cstdlib>
 #include <algorithm>
-#include <random> 
+#include <random>
 
 class MnistDataset {
 private:
-    static constexpr size_t IMAGE_SIZE = 28;
-    static constexpr size_t PIXELS = IMAGE_SIZE * IMAGE_SIZE;
-    static constexpr size_t CLASSES = 10;
-
     size_t count_ = 0;
-    std::vector<scalar_t> all_images_data_; // Single continuous buffer
+    std::vector<scalar_t> all_images_data_;
     std::vector<unsigned char> labels_;
     std::vector<size_t> indices_;
     std::mt19937 gen_;

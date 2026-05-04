@@ -2,6 +2,8 @@
 #include <algorithm>
 #include <stdexcept>
 #include <omp.h>
+#include <iostream>
+#include <string>
 
 Matrix::Matrix(size_t rows, size_t cols, scalar_t initial_val)
     : rows_(rows), cols_(cols), capacity_(rows * cols), data_(rows * cols, initial_val) {}
@@ -31,7 +33,7 @@ void Matrix::reshape(size_t rows, size_t cols) {
     cols_ = cols;
     if (new_size > capacity_) {
         capacity_ = new_size;
-        data_.resize(new_size, 0.0f);
+        data_.resize(new_size);
     }
 }
 
@@ -64,7 +66,7 @@ void Matrix::multiply_transA(const Matrix& A, const Matrix& B, Matrix& C) {
     #pragma omp parallel for if(M * K * N > 50000)
     for (size_t i = 0; i < M; ++i) {
         for (size_t k = 0; k < K; ++k) {
-            scalar_t a_val = A(k, i); 
+            scalar_t a_val = A(k, i);
             if (a_val == 0.0f) continue;
             for (size_t j = 0; j < N; ++j) {
                 C(i, j) += a_val * B(k, j);
@@ -85,7 +87,7 @@ void Matrix::multiply_transB(const Matrix& A, const Matrix& B, Matrix& C) {
         for (size_t j = 0; j < N; ++j) {
             scalar_t sum = 0.0f;
             for (size_t k = 0; k < K; ++k) {
-                sum += A(i, k) * B(j, k); 
+                sum += A(i, k) * B(j, k);
             }
             C(i, j) = sum;
         }
@@ -121,17 +123,6 @@ void Matrix::add_scaled(const Matrix& other, scalar_t scale) {
     size_t n = rows_ * cols_;
     #pragma omp simd
     for (size_t i = 0; i < n; ++i) data_[i] += other.data_[i] * scale;
-}
-
-void Matrix::add_outer_product(const Matrix& left, const Matrix& right) {
-    bool use_omp = (rows_ * cols_) > 10000;
-    #pragma omp parallel for if(use_omp)
-    for (size_t i = 0; i < rows_; ++i) {
-        scalar_t left_val = left(i, 0);
-        for (size_t j = 0; j < cols_; ++j) {
-            (*this)(i, j) += left_val * right(j, 0);
-        }
-    }
 }
 
 void Matrix::subtract_scaled(const Matrix& grad, scalar_t scale) {
@@ -171,13 +162,15 @@ void Matrix::sum_columns(Matrix& out) const {
 }
 
 void Matrix::save(std::ostream& os) const {
-    os.write(reinterpret_cast<const char*>(&rows_), sizeof(rows_));
-    os.write(reinterpret_cast<const char*>(&cols_), sizeof(cols_));
-    os.write(reinterpret_cast<const char*>(data_.data()), rows_ * cols_ * sizeof(scalar_t));
+    uint64_t r = static_cast<uint64_t>(rows_);
+    uint64_t c = static_cast<uint64_t>(cols_);
+    os.write(reinterpret_cast<const char*>(&r), sizeof(r));
+    os.write(reinterpret_cast<const char*>(&c), sizeof(c));
+    os.write(reinterpret_cast<const char*>(data_.data()), r * c * sizeof(scalar_t));
 }
 
 void Matrix::load(std::istream& is) {
-    size_t r, c;
+    uint64_t r, c;
     is.read(reinterpret_cast<char*>(&r), sizeof(r));
     is.read(reinterpret_cast<char*>(&c), sizeof(c));
     if (r != rows_ || c != cols_) {

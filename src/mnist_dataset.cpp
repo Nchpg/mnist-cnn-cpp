@@ -1,4 +1,5 @@
 #include "mnist_dataset.hpp"
+#include "constants.hpp"
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -73,7 +74,7 @@ MnistDataset MnistDataset::load_bin(const std::string& path, size_t limit) {
         }
 
         for (size_t i = 0; i < PIXELS; ++i) {
-            scalar_t val = static_cast<scalar_t>(pixels[i]) / 255.0f;
+            scalar_t val = static_cast<scalar_t>(pixels[i]) / NORMALIZE_DIVISOR;
             dataset.all_images_data_.push_back(val);
         }
         dataset.labels_.push_back(label);
@@ -104,11 +105,11 @@ MnistDataset MnistDataset::load_csv(const std::string& path, size_t limit) {
         std::stringstream ss(l);
         std::string token;
         if (!std::getline(ss, token, ',')) return;
-        
+
         dataset.labels_.push_back(static_cast<unsigned char>(std::stoi(token)));
         for (size_t i = 0; i < PIXELS; ++i) {
             if (!std::getline(ss, token, ',')) throw std::runtime_error("Invalid CSV row");
-            dataset.all_images_data_.push_back(static_cast<scalar_t>(std::stoi(token)) / 255.0f);
+            dataset.all_images_data_.push_back(static_cast<scalar_t>(std::stoi(token)) / NORMALIZE_DIVISOR);
         }
         dataset.indices_.push_back(dataset.count_);
         dataset.count_++;

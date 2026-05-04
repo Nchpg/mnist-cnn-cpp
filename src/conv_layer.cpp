@@ -154,9 +154,9 @@ const Matrix& ConvLayer::backward(const Matrix& gradient) {
 
     Matrix::multiply_transB(gemm_out_, im2col_buffer_, filters_grad_matrix_);
     
-    Matrix grad_col_buffer(weights_per_filter, gemm_out_.cols());
-    Matrix::multiply_transA(filters_matrix_, gemm_out_, grad_col_buffer);
-    col2im(grad_col_buffer, grad_input_);
+    grad_col_buffer_.reshape(weights_per_filter, gemm_out_.cols());
+    Matrix::multiply_transA(filters_matrix_, gemm_out_, grad_col_buffer_);
+    col2im(grad_col_buffer_, grad_input_);
 
     return grad_input_;
 }
