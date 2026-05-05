@@ -5,7 +5,7 @@
 #include <stdexcept>
 
 PoolingLayer::PoolingLayer(size_t input_rows, size_t input_cols,
-                            size_t filter_count, size_t pool_size, size_t stride)
+                           size_t filter_count, size_t pool_size, size_t stride)
     : pool_size_(pool_size)
     , stride_(stride)
 {

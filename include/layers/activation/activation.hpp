@@ -14,4 +14,4 @@ namespace Activation
     scalar_t relu_deriv(scalar_t x);
 
     void softmax(const Matrix &logits, Matrix &probs);
-}
+} // namespace Activation

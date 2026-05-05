@@ -5,9 +5,9 @@
 #include <string>
 #include <vector>
 
-#include "utils/matrix.hpp"
 #include "core/model.hpp"
 #include "data/mnist_dataset.hpp"
+#include "utils/matrix.hpp"
 
 enum class OptimizerType
 {
@@ -15,10 +15,17 @@ enum class OptimizerType
     Adam
 };
 
+enum class LossType
+{
+    CrossEntropy,
+    MSE
+};
+
 struct Hyperparameters
 {
     size_t batch_size = 64;
     OptimizerType optimizer_type = OptimizerType::Adam;
+    LossType loss_type = LossType::CrossEntropy;
     scalar_t learning_rate = 0.001f;
     scalar_t beta1 = 0.9f;
     scalar_t beta2 = 0.999f;

@@ -5,17 +5,15 @@ TensorBatch::TensorBatch()
     , channels_(0)
     , height_(0)
     , width_(0)
-{
-}
+{}
 
-TensorBatch::TensorBatch(size_t channels, size_t height, size_t width, size_t batch_size,
-                         scalar_t init_val)
+TensorBatch::TensorBatch(size_t channels, size_t height, size_t width,
+                         size_t batch_size, scalar_t init_val)
     : Matrix(channels * height * width, batch_size, init_val)
     , channels_(channels)
     , height_(height)
     , width_(width)
-{
-}
+{}
 
 void TensorBatch::copy_from(const Matrix &m)
 {
@@ -63,8 +61,7 @@ const scalar_t &TensorBatch::operator()(size_t b, size_t c, size_t y,
 }
 
 const scalar_t &TensorBatch::read_mat(const Matrix &m, size_t b, size_t c,
-                                      size_t y, size_t x, size_t h,
-                                      size_t w)
+                                      size_t y, size_t x, size_t h, size_t w)
 {
     return m((c * h + y) * w + x, b);
 }

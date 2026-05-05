@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdexcept>
+#include <string>
 #include <vector>
 
 #include "utils/matrix.hpp"
@@ -13,4 +15,22 @@ public:
     virtual void backward(const Matrix &predictions,
                           const std::vector<size_t> &targets,
                           Matrix &grad_output) = 0;
+
+    virtual bool supports_fusion_with(const std::string &layer_type) const
+    {
+        (void)layer_type;
+        return false;
+    }
+
+    virtual void backward_fused(const std::string &layer_type,
+                                const Matrix &probs,
+                                const std::vector<size_t> &targets,
+                                Matrix &grad_logits)
+    {
+        (void)layer_type;
+        (void)probs;
+        (void)targets;
+        (void)grad_logits;
+        throw std::runtime_error("Fusion not supported for this layer type");
+    }
 };

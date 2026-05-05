@@ -2,6 +2,7 @@
   "input_shape": {"channels": 1, "height": 28, "width": 28},
   "hyperparameters": {
     "batch_size": 64,
+    "loss": "CrossEntropy",
     "optimizer": {
       "type": "Adam",
       "learning_rate": 0.001,
@@ -29,6 +30,7 @@
     {"type": "Dense", "units": 128},
     {"type": "ReLU"},
     {"type": "Dropout", "ratio": 0.5},
-    {"type": "Dense", "units": 10}
+    {"type": "Dense", "units": 10},
+    {"type": "Softmax"}
   ]
 }

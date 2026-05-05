@@ -2,8 +2,8 @@
 
 #include <stdexcept>
 
-#include "utils/matrix.hpp"
 #include "data/constants.hpp"
+#include "utils/matrix.hpp"
 
 class MnistDataset
 {

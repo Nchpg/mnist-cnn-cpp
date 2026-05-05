@@ -17,20 +17,22 @@ SERVER_TARGET := mnist_server
 AUGMENT_TARGET := mnist_augment
 
 COMMON_SRC := src/core/cnn.cpp \
-             src/layers/dense_layer.cpp \
-             src/data/mnist_dataset.cpp \
-             src/utils/matrix.cpp \
-             src/utils/tensor_batch.cpp \
-             src/layers/pooling_layer.cpp \
-             src/layers/conv_layer.cpp \
-             src/layers/batchnorm_layer.cpp \
-             src/loss/cross_entropy_loss.cpp \
-             src/layers/activation/activation.cpp \
-             src/optimizers/sgd_optimizer.cpp \
-             src/optimizers/adam_optimizer.cpp \
-             src/layers/flatten_layer.cpp \
-             src/layers/dropout_layer.cpp \
-             src/layers/relu_layer.cpp
+              src/layers/dense_layer.cpp \
+              src/data/mnist_dataset.cpp \
+              src/utils/matrix.cpp \
+              src/utils/tensor_batch.cpp \
+              src/layers/pooling_layer.cpp \
+              src/layers/conv_layer.cpp \
+              src/layers/batchnorm_layer.cpp \
+              src/loss/cross_entropy_loss.cpp \
+              src/loss/mse_loss.cpp \
+              src/layers/activation/activation.cpp \
+              src/layers/activation/softmax_layer.cpp \
+              src/optimizers/sgd_optimizer.cpp \
+              src/optimizers/adam_optimizer.cpp \
+              src/layers/flatten_layer.cpp \
+              src/layers/dropout_layer.cpp \
+              src/layers/relu_layer.cpp
 CLI_SRC := src/core/main.cpp $(COMMON_SRC)
 SERVER_SRC := src/core/server.cpp $(COMMON_SRC)
 AUGMENT_SRC := src/data/data_augmentation.cpp

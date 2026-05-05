@@ -1,7 +1,7 @@
 #pragma once
 
-#include <cstring>
 #include <cstddef>
+#include <cstring>
 
 #include "utils/matrix.hpp"
 

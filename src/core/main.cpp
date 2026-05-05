@@ -5,9 +5,9 @@
 #include <sstream>
 #include <string_view>
 
-#include "layers/activation/activation.hpp"
 #include "core/cnn.hpp"
 #include "data/mnist_dataset.hpp"
+#include "layers/activation/activation.hpp"
 
 static void usage(const char *program)
 {
@@ -69,6 +69,10 @@ static void print_training_params(const Hyperparameters &hp, size_t epochs,
               << (hp.optimizer_type == OptimizerType::SGD ? "SGD" : "Adam")
               << "\n";
     std::cout << "  Learning Rate: " << hp.learning_rate << "\n";
+    std::cout << "  Loss: "
+              << (hp.loss_type == LossType::CrossEntropy ? "CrossEntropy"
+                                                         : "MSE")
+              << "\n";
     if (hp.optimizer_type == OptimizerType::Adam)
     {
         std::cout << "  Adam Params: beta1=" << hp.beta1
@@ -164,7 +168,7 @@ int main(int argc, char **argv)
         cnn.set_hyperparameters(hp);
 
         MnistDataset train = MnistDataset::load(csv_path, limit);
-        train.apply_normalization(); // Use normalization stored in model
+        train.apply_normalization();
 
         std::cout << "Resuming training from model: " << model_in << " using "
                   << csv_path << std::endl;

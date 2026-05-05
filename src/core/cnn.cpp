@@ -12,14 +12,9 @@
 #include <sstream>
 #include <stdexcept>
 
-#include "layers/activation/activation.hpp"
-#include "utils/utils.hpp"
-#include "loss/loss.hpp"
-#include "loss/cross_entropy_loss.hpp"
-#include "optimizers/optimizer.hpp"
-#include "optimizers/sgd_optimizer.hpp"
-#include "optimizers/adam_optimizer.hpp"
 #include "data/mnist_dataset.hpp"
+#include "layers/activation/activation.hpp"
+#include "layers/activation/softmax_layer.hpp"
 #include "layers/batchnorm_layer.hpp"
 #include "layers/conv_layer.hpp"
 #include "layers/dense_layer.hpp"
@@ -27,6 +22,13 @@
 #include "layers/flatten_layer.hpp"
 #include "layers/pooling_layer.hpp"
 #include "layers/relu_layer.hpp"
+#include "loss/cross_entropy_loss.hpp"
+#include "loss/loss.hpp"
+#include "loss/mse_loss.hpp"
+#include "optimizers/adam_optimizer.hpp"
+#include "optimizers/optimizer.hpp"
+#include "optimizers/sgd_optimizer.hpp"
+#include "utils/utils.hpp"
 
 using json = nlohmann::json;
 
@@ -54,6 +56,16 @@ void CNN::build_from_json(const nlohmann::json &config_data)
     {
         const auto &hp = config_data["hyperparameters"];
         hp_.batch_size = hp.value("batch_size", 64);
+
+        std::string loss_str = hp.value("loss", "CrossEntropy");
+        if (loss_str == "MSE")
+        {
+            hp_.loss_type = LossType::MSE;
+        }
+        else
+        {
+            hp_.loss_type = LossType::CrossEntropy;
+        }
 
         if (hp.contains("optimizer"))
         {
@@ -135,6 +147,12 @@ void CNN::build_from_json(const nlohmann::json &config_data)
             current_shape = layer->get_output_shape(current_shape);
             model_.add(std::move(layer));
         }
+        else if (type == "Softmax")
+        {
+            auto layer = std::make_unique<SoftmaxLayer>();
+            current_shape = layer->get_output_shape(current_shape);
+            model_.add(std::move(layer));
+        }
     }
 
     if (hp_.optimizer_type == OptimizerType::SGD)
@@ -151,9 +169,8 @@ void CNN::build_from_json(const nlohmann::json &config_data)
 std::vector<scalar_t> CNN::predict(const Matrix &image)
 {
     model_.set_training(false);
-    const Matrix &logits = model_.forward(image);
-    Matrix probs(logits.rows(), logits.cols());
-    Activation::softmax(logits, probs);
+
+    const Matrix &probs = model_.forward(image);
 
     std::vector<scalar_t> result(probs.rows());
     for (size_t i = 0; i < probs.rows(); i++)
@@ -164,8 +181,9 @@ std::vector<scalar_t> CNN::predict(const Matrix &image)
 int CNN::predict_label(const Matrix &image)
 {
     model_.set_training(false);
-    const Matrix &logits = model_.forward(image);
-    auto results = Utils::argmax(logits);
+
+    const Matrix &probs = model_.forward(image);
+    auto results = Utils::argmax(probs);
     return static_cast<int>(results[0]);
 }
 
@@ -184,11 +202,34 @@ void CNN::train(MnistDataset &dataset, size_t epochs)
     Matrix batch_images;
     std::vector<size_t> batch_labels;
     Matrix grad_output;
-    Matrix probs;
-    CrossEntropyLoss loss_fn;
+
+    std::unique_ptr<Loss> loss_fn;
+    if (hp_.loss_type == LossType::CrossEntropy)
+    {
+        loss_fn = std::make_unique<CrossEntropyLoss>();
+    }
+    else if (hp_.loss_type == LossType::MSE)
+    {
+        loss_fn = std::make_unique<MSELoss>();
+    }
+    else
+    {
+        throw std::runtime_error("Unsupported loss type");
+    }
 
     scalar_t final_loss = 0.0f;
     scalar_t final_acc = 0.0f;
+
+    bool use_fused_optimization = false;
+    std::string last_layer_type = "";
+    if (!model_.layers().empty())
+    {
+        last_layer_type =
+            model_.layers().back()->get_config().value("type", "");
+        use_fused_optimization = loss_fn->supports_fusion_with(last_layer_type);
+    }
+
+    size_t samples_to_process = (total_samples / batch_size) * batch_size;
 
     for (size_t epoch = 0; epoch < epochs; epoch++)
     {
@@ -196,35 +237,36 @@ void CNN::train(MnistDataset &dataset, size_t epochs)
         size_t correct = 0;
         scalar_t total_loss = 0.0f;
 
-        size_t samples_to_process = (total_samples / batch_size) * batch_size;
-
         for (size_t sample = 0; sample < samples_to_process;
              sample += batch_size)
         {
             dataset.get_batch_images(sample, batch_size, batch_images);
             dataset.get_batch_labels(sample, batch_size, batch_labels);
 
-            const Matrix &logits = model_.forward(batch_images);
+            const Matrix &output = model_.forward(batch_images);
 
-            if (probs.rows() != logits.rows() || probs.cols() != batch_size)
-            {
-                probs.reshape(logits.rows(), batch_size);
-            }
-            Activation::softmax(logits, probs);
-
-            total_loss += loss_fn.forward(probs, batch_labels)
+            total_loss += loss_fn->forward(output, batch_labels)
                 * static_cast<scalar_t>(batch_size);
 
-            auto predictions = Utils::argmax(logits);
+            auto predictions = Utils::argmax(output);
             for (size_t b = 0; b < batch_size; ++b)
             {
                 if (predictions[b] == batch_labels[b])
                     correct++;
             }
 
-            loss_fn.backward(probs, batch_labels, grad_output);
+            if (use_fused_optimization)
+            {
+                loss_fn->backward_fused(last_layer_type, output, batch_labels,
+                                        grad_output);
+                model_.backward_skip_last(grad_output);
+            }
+            else
+            {
+                loss_fn->backward(output, batch_labels, grad_output);
+                model_.backward(grad_output);
+            }
 
-            model_.backward(grad_output);
             model_.step();
             model_.clear_gradients();
 
@@ -261,6 +303,8 @@ void CNN::train(MnistDataset &dataset, size_t epochs)
     session["final_accuracy"] = final_acc;
     session["hyperparameters"] = {
         { "batch_size", hp_.batch_size },
+        { "loss",
+          (hp_.loss_type == LossType::CrossEntropy) ? "CrossEntropy" : "MSE" },
         { "optimizer",
           { { "type",
               (hp_.optimizer_type == OptimizerType::SGD) ? "SGD" : "Adam" },
@@ -314,6 +358,8 @@ void CNN::save(const std::string &path) const
 
     header["hyperparameters"] = {
         { "batch_size", hp_.batch_size },
+        { "loss",
+          (hp_.loss_type == LossType::CrossEntropy) ? "CrossEntropy" : "MSE" },
         { "optimizer",
           { { "type",
               (hp_.optimizer_type == OptimizerType::SGD) ? "SGD" : "Adam" },

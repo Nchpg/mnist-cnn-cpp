@@ -26,10 +26,8 @@ public:
     using Matrix::operator();
 
     scalar_t &operator()(size_t b, size_t c, size_t y, size_t x);
-    const scalar_t &operator()(size_t b, size_t c, size_t y,
-                               size_t x) const;
+    const scalar_t &operator()(size_t b, size_t c, size_t y, size_t x) const;
 
     static const scalar_t &read_mat(const Matrix &m, size_t b, size_t c,
-                                    size_t y, size_t x, size_t h,
-                                    size_t w);
+                                    size_t y, size_t x, size_t h, size_t w);
 };

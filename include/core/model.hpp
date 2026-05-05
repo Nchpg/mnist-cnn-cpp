@@ -59,6 +59,17 @@ public:
         }
     }
 
+    void backward_skip_last(const Matrix &gradient)
+    {
+        if (layers_.empty())
+            return;
+        const Matrix *grad = &gradient;
+        for (auto it = layers_.rbegin() + 1; it != layers_.rend(); ++it)
+        {
+            grad = &((*it)->backward(*grad));
+        }
+    }
+
     void step()
     {
         if (optimizer_)
