@@ -127,7 +127,9 @@ void CNN::build_from_json(const nlohmann::json &config_data)
         }
         else if (type == "Flatten")
         {
-            auto layer = std::make_unique<FlattenLayer>();
+            auto layer = std::make_unique<FlattenLayer>(current_shape.channels,
+                                                        current_shape.height,
+                                                        current_shape.width);
             current_shape = layer->get_output_shape(current_shape);
             model_.add(std::move(layer));
         }
@@ -173,23 +175,31 @@ void CNN::build_from_json(const nlohmann::json &config_data)
     }
 }
 
-std::vector<scalar_t> CNN::predict(const Matrix &image)
+std::vector<scalar_t> CNN::predict(const Tensor &image)
 {
     model_.set_training(false);
 
-    const Matrix &probs = model_.forward(image);
+    Tensor img_batch = image;
+    img_batch.reshape(Shape(
+        { 1, input_shape_.channels, input_shape_.height, input_shape_.width }));
 
-    std::vector<scalar_t> result(probs.rows());
-    for (size_t i = 0; i < probs.rows(); i++)
-        result[i] = probs(i, 0);
+    const Tensor &probs = model_.forward(img_batch);
+
+    std::vector<scalar_t> result(probs.shape()[1]);
+    for (size_t i = 0; i < probs.shape()[1]; i++)
+        result[i] = probs(0, i);
     return result;
 }
 
-int CNN::predict_label(const Matrix &image)
+int CNN::predict_label(const Tensor &image)
 {
     model_.set_training(false);
 
-    const Matrix &probs = model_.forward(image);
+    Tensor img_batch = image;
+    img_batch.reshape(Shape(
+        { 1, input_shape_.channels, input_shape_.height, input_shape_.width }));
+
+    const Tensor &probs = model_.forward(img_batch);
     auto results = Utils::argmax(probs);
     return static_cast<int>(results[0]);
 }
@@ -206,9 +216,9 @@ void CNN::train(Dataset &dataset, size_t epochs)
     const size_t total_samples = dataset.count();
     const int bar_width = 30;
 
-    Matrix batch_images;
+    Tensor batch_images;
     std::vector<size_t> batch_labels;
-    Matrix grad_output;
+    Tensor grad_output;
 
     std::unique_ptr<Loss> loss_fn;
     if (hp_.loss_type == LossType::CrossEntropy)
@@ -250,7 +260,11 @@ void CNN::train(Dataset &dataset, size_t epochs)
             dataset.get_batch_images(sample, batch_size, batch_images);
             dataset.get_batch_labels(sample, batch_size, batch_labels);
 
-            const Matrix &output = model_.forward(batch_images);
+            batch_images.reshape(
+                Shape({ batch_size, input_shape_.channels, input_shape_.height,
+                        input_shape_.width }));
+
+            const Tensor &output = model_.forward(batch_images);
 
             total_loss += loss_fn->forward(output, batch_labels)
                 * static_cast<scalar_t>(batch_size);
@@ -314,7 +328,7 @@ void CNN::train(Dataset &dataset, size_t epochs)
           (hp_.loss_type == LossType::CrossEntropy) ? "CrossEntropy" : "MSE" },
         { "optimizer",
           { { "type",
-               (hp_.optimizer_type == OptimizerType::SGD) ? "SGD" : "Adam" },
+              (hp_.optimizer_type == OptimizerType::SGD) ? "SGD" : "Adam" },
             { "learning_rate", hp_.learning_rate },
             { "beta1", hp_.beta1 },
             { "beta2", hp_.beta2 },
@@ -329,7 +343,7 @@ scalar_t CNN::accuracy(const Dataset &dataset)
     size_t correct = 0;
     const size_t eval_batch_size = 64;
 
-    Matrix batch_images;
+    Tensor batch_images;
     std::vector<size_t> batch_labels;
 
     for (size_t i = 0; i < dataset.count(); i += eval_batch_size)
@@ -339,7 +353,11 @@ scalar_t CNN::accuracy(const Dataset &dataset)
         dataset.get_batch_images(i, actual_batch_size, batch_images);
         dataset.get_batch_labels(i, actual_batch_size, batch_labels);
 
-        const Matrix &logits = model_.forward(batch_images);
+        batch_images.reshape(
+            Shape({ actual_batch_size, input_shape_.channels,
+                    input_shape_.height, input_shape_.width }));
+
+        const Tensor &logits = model_.forward(batch_images);
         auto predictions = Utils::argmax(logits);
 
         for (size_t b = 0; b < actual_batch_size; ++b)

@@ -8,7 +8,7 @@
 #include "core/model.hpp"
 #include "data/dataset.hpp"
 #include "data/mnist_dataset.hpp"
-#include "utils/matrix.hpp"
+#include "utils/tensor.hpp"
 
 enum class OptimizerType
 {
@@ -52,8 +52,8 @@ public:
     void load_from_json(const std::string &config_path);
     void load_from_model(const std::string &path);
 
-    std::vector<scalar_t> predict(const Matrix &image);
-    int predict_label(const Matrix &image);
+    std::vector<scalar_t> predict(const Tensor &image);
+    int predict_label(const Tensor &image);
 
     void train(Dataset &dataset, size_t epochs);
     scalar_t accuracy(const Dataset &dataset);

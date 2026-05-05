@@ -1,16 +1,18 @@
 #include "layers/activation/relu_layer.hpp"
+
 #include "layers/activation/activation.hpp"
 
-ReluLayer::ReluLayer() {}
+ReluLayer::ReluLayer()
+{}
 
-const Matrix &ReluLayer::forward(const Matrix &input)
+const Tensor &ReluLayer::forward(const Tensor &input)
 {
     input_ptr_ = &input;
     Activation::relu(input, output_);
     return output_;
 }
 
-const Matrix &ReluLayer::backward(const Matrix &gradient)
+const Tensor &ReluLayer::backward(const Tensor &gradient)
 {
     Activation::relu_backward(*input_ptr_, gradient, grad_input_);
     return grad_input_;
@@ -32,7 +34,7 @@ void ReluLayer::load(std::istream &is)
 
 nlohmann::json ReluLayer::get_config() const
 {
-    return {{"type", "ReLU"}};
+    return { { "type", "ReLU" } };
 }
 
 Shape3D ReluLayer::get_output_shape(const Shape3D &input_shape) const

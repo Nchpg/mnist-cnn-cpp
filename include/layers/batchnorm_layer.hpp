@@ -1,44 +1,55 @@
 #pragma once
 
-#include <cstddef>
+#include <vector>
 
 #include "layers/layer.hpp"
-#include "utils/matrix.hpp"
 
 class BatchNormLayer : public Layer
 {
-public:
-    static constexpr const char *LAYER_NAME = "BATCHNORM";
-
 private:
     size_t channels_;
     size_t spatial_size_;
-    Matrix gamma_;
-    Matrix beta_;
-    Matrix grad_gamma_;
-    Matrix grad_beta_;
-    Matrix running_mean_;
-    Matrix running_var_;
     scalar_t momentum_ = 0.9f;
     scalar_t epsilon_ = 1e-5f;
+
+    Tensor gamma_;
+    Tensor beta_;
+    Tensor grad_gamma_;
+    Tensor grad_beta_;
+    Tensor running_mean_;
+    Tensor running_var_;
+    Tensor saved_mean_;
+    Tensor saved_var_;
+
+    const Tensor *input_ptr_ = nullptr;
+    Tensor normalized_;
+    Tensor output_;
+    Tensor grad_input_;
+
     bool is_training_ = true;
-    Matrix saved_mean_;
-    Matrix saved_var_;
-    const Matrix *input_ptr_ = nullptr;
-    Matrix normalized_;
-    Matrix output_;
 
 public:
     BatchNormLayer(size_t channels, size_t spatial_size);
     ~BatchNormLayer() override = default;
 
-    const Matrix &forward(const Matrix &input) override;
-    const Matrix &backward(const Matrix &gradient) override;
+    const Tensor &forward(const Tensor &input) override;
+    const Tensor &backward(const Tensor &gradient) override;
 
     void clear_gradients() override;
-    void set_training(bool training) override;
 
-    std::vector<Parameter> get_parameters() override;
+    void set_training(bool training)
+    {
+        is_training_ = training;
+    }
+
+    std::vector<Tensor *> get_weights() override
+    {
+        return { &gamma_, &beta_ };
+    }
+    std::vector<Tensor *> get_gradients() override
+    {
+        return { &grad_gamma_, &grad_beta_ };
+    }
 
     void save(std::ostream &os) const override;
     void load(std::istream &is) override;

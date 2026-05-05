@@ -224,7 +224,7 @@ int main(int argc, char **argv)
         CNN cnn;
         cnn.load_from_model(model_in);
         MnistDataset dataset = MnistDataset::load(csv_path, index + 1);
-        Matrix image = dataset.image(index);
+        Tensor image = dataset.image(index);
 
         std::vector<scalar_t> probabilities = cnn.predict(image);
         int prediction = cnn.predict_label(image);

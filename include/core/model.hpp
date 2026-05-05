@@ -17,13 +17,17 @@ public:
 
     void set_optimizer(std::unique_ptr<Optimizer> optimizer)
     {
-        std::vector<Parameter> all_params;
+        std::vector<Tensor *> all_weights;
+        std::vector<Tensor *> all_grads;
         for (auto &layer : layers_)
         {
-            auto params = layer->get_parameters();
-            all_params.insert(all_params.end(), params.begin(), params.end());
+            auto weights = layer->get_weights();
+            auto grads = layer->get_gradients();
+            all_weights.insert(all_weights.end(), weights.begin(),
+                               weights.end());
+            all_grads.insert(all_grads.end(), grads.begin(), grads.end());
         }
-        optimizer->add_parameters(all_params);
+        optimizer->set_parameters(all_weights, all_grads);
         optimizer_ = std::move(optimizer);
     }
 
@@ -40,9 +44,9 @@ public:
         }
     }
 
-    const Matrix &forward(const Matrix &input)
+    const Tensor &forward(const Tensor &input)
     {
-        const Matrix *x = &input;
+        const Tensor *x = &input;
         for (auto &layer : layers_)
         {
             x = &(layer->forward(*x));
@@ -50,20 +54,20 @@ public:
         return *x;
     }
 
-    void backward(const Matrix &gradient)
+    void backward(const Tensor &gradient)
     {
-        const Matrix *grad = &gradient;
+        const Tensor *grad = &gradient;
         for (auto it = layers_.rbegin(); it != layers_.rend(); ++it)
         {
             grad = &((*it)->backward(*grad));
         }
     }
 
-    void backward_skip_last(const Matrix &gradient)
+    void backward_skip_last(const Tensor &gradient)
     {
         if (layers_.empty())
             return;
-        const Matrix *grad = &gradient;
+        const Tensor *grad = &gradient;
         for (auto it = layers_.rbegin() + 1; it != layers_.rend(); ++it)
         {
             grad = &((*it)->backward(*grad));

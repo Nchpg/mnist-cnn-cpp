@@ -5,22 +5,20 @@
 #include <stdexcept>
 #include <vector>
 
-#include "utils/matrix.hpp"
+#include "utils/tensor.hpp"
 #include "utils/utils.hpp"
 
 namespace Activation
 {
-    // ReLU
-    void relu(const Matrix &in, Matrix &out);
-    void relu_backward(const Matrix &in, const Matrix &grad_out, Matrix &grad_in);
+    void relu(const Tensor &in, Tensor &out);
+    void relu_backward(const Tensor &in, const Tensor &grad_out,
+                       Tensor &grad_in);
 
-    // Sigmoid
-    void sigmoid(const Matrix &in, Matrix &out);
-    void sigmoid_backward(const Matrix &out, const Matrix &grad_out,
-                          Matrix &grad_in);
+    void sigmoid(const Tensor &in, Tensor &out);
+    void sigmoid_backward(const Tensor &out, const Tensor &grad_out,
+                          Tensor &grad_in);
 
-    // Softmax
-    void softmax(const Matrix &in, Matrix &out);
-    void softmax_backward(const Matrix &out, const Matrix &grad_out,
-                          Matrix &grad_in);
+    void softmax(const Tensor &in, Tensor &out);
+    void softmax_backward(const Tensor &out, const Tensor &grad_out,
+                          Tensor &grad_in);
 } // namespace Activation

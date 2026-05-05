@@ -4,7 +4,7 @@
 #include <memory>
 #include <vector>
 
-#include "layers/layer.hpp"
+#include "utils/tensor.hpp"
 
 class Optimizer
 {
@@ -12,7 +12,8 @@ private:
     scalar_t learning_rate_;
 
 protected:
-    std::vector<Parameter> parameters_;
+    std::vector<Tensor *> weights_;
+    std::vector<Tensor *> gradients_;
 
 public:
     Optimizer(scalar_t learning_rate = 0.0f)
@@ -32,8 +33,10 @@ public:
         return learning_rate_;
     }
 
-    virtual void add_parameters(const std::vector<Parameter> &params)
+    virtual void set_parameters(const std::vector<Tensor *> &weights,
+                                const std::vector<Tensor *> &grads)
     {
-        parameters_.insert(parameters_.end(), params.begin(), params.end());
+        weights_ = weights;
+        gradients_ = grads;
     }
 };

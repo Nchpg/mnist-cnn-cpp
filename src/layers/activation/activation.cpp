@@ -7,15 +7,14 @@
 
 namespace Activation
 {
-    // --- ReLU ---
-    void relu(const Matrix &in, Matrix &out)
+    void relu(const Tensor &in, Tensor &out)
     {
-        if (out.rows() != in.rows() || out.cols() != in.cols())
-            out.reshape(in.rows(), in.cols());
+        if (out.shape() != in.shape())
+            out.reshape(in.shape());
 
         size_t n = in.size();
-        const scalar_t *in_ptr = in.data();
-        scalar_t *out_ptr = out.data();
+        const scalar_t *in_ptr = in.data_ptr();
+        scalar_t *out_ptr = out.data_ptr();
 
 #pragma omp parallel for
         for (size_t i = 0; i < n; ++i)
@@ -24,15 +23,16 @@ namespace Activation
         }
     }
 
-    void relu_backward(const Matrix &in, const Matrix &grad_out, Matrix &grad_in)
+    void relu_backward(const Tensor &in, const Tensor &grad_out,
+                       Tensor &grad_in)
     {
-        if (grad_in.rows() != in.rows() || grad_in.cols() != in.cols())
-            grad_in.reshape(in.rows(), in.cols());
+        if (grad_in.shape() != in.shape())
+            grad_in.reshape(in.shape());
 
         size_t n = in.size();
-        const scalar_t *in_ptr = in.data();
-        const scalar_t *grad_out_ptr = grad_out.data();
-        scalar_t *grad_in_ptr = grad_in.data();
+        const scalar_t *in_ptr = in.data_ptr();
+        const scalar_t *grad_out_ptr = grad_out.data_ptr();
+        scalar_t *grad_in_ptr = grad_in.data_ptr();
 
 #pragma omp parallel for
         for (size_t i = 0; i < n; ++i)
@@ -41,15 +41,14 @@ namespace Activation
         }
     }
 
-    // --- Sigmoid ---
-    void sigmoid(const Matrix &in, Matrix &out)
+    void sigmoid(const Tensor &in, Tensor &out)
     {
-        if (out.rows() != in.rows() || out.cols() != in.cols())
-            out.reshape(in.rows(), in.cols());
+        if (out.shape() != in.shape())
+            out.reshape(in.shape());
 
         size_t n = in.size();
-        const scalar_t *in_ptr = in.data();
-        scalar_t *out_ptr = out.data();
+        const scalar_t *in_ptr = in.data_ptr();
+        scalar_t *out_ptr = out.data_ptr();
 
 #pragma omp parallel for
         for (size_t i = 0; i < n; ++i)
@@ -58,16 +57,16 @@ namespace Activation
         }
     }
 
-    void sigmoid_backward(const Matrix &out, const Matrix &grad_out,
-                          Matrix &grad_in)
+    void sigmoid_backward(const Tensor &out, const Tensor &grad_out,
+                          Tensor &grad_in)
     {
-        if (grad_in.rows() != out.rows() || grad_in.cols() != out.cols())
-            grad_in.reshape(out.rows(), out.cols());
+        if (grad_in.shape() != out.shape())
+            grad_in.reshape(out.shape());
 
         size_t n = out.size();
-        const scalar_t *out_ptr = out.data();
-        const scalar_t *grad_out_ptr = grad_out.data();
-        scalar_t *grad_in_ptr = grad_in.data();
+        const scalar_t *out_ptr = out.data_ptr();
+        const scalar_t *grad_out_ptr = grad_out.data_ptr();
+        scalar_t *grad_in_ptr = grad_in.data_ptr();
 
 #pragma omp parallel for
         for (size_t i = 0; i < n; ++i)
@@ -76,49 +75,50 @@ namespace Activation
         }
     }
 
-    // --- Softmax ---
-    void softmax(const Matrix &in, Matrix &out)
+    void softmax(const Tensor &in, Tensor &out)
     {
-        size_t num_rows = in.rows();
-        size_t cols = in.cols();
-        if (out.rows() != num_rows || out.cols() != cols)
+        size_t batch_size = in.shape()[0];
+        size_t num_classes = in.shape()[1];
+        if (out.rank() != 2 || out.shape()[0] != batch_size
+            || out.shape()[1] != num_classes)
         {
-            out.reshape(num_rows, cols);
+            out.reshape(Shape({ batch_size, num_classes }));
         }
 
 #pragma omp parallel for
-        for (size_t j = 0; j < cols; ++j)
+        for (size_t b = 0; b < batch_size; ++b)
         {
-            scalar_t max_val = in(0, j);
-            for (size_t i = 1; i < num_rows; ++i)
+            scalar_t max_val = in(b, 0);
+            for (size_t c = 1; c < num_classes; ++c)
             {
-                if (in(i, j) > max_val)
-                    max_val = in(i, j);
+                if (in(b, c) > max_val)
+                    max_val = in(b, c);
             }
 
             scalar_t sum = 0.0f;
-            for (size_t i = 0; i < num_rows; ++i)
+            for (size_t c = 0; c < num_classes; ++c)
             {
-                out(i, j) = std::exp(in(i, j) - max_val);
-                sum += out(i, j);
+                out(b, c) = std::exp(in(b, c) - max_val);
+                sum += out(b, c);
             }
             scalar_t inv_sum = 1.0f / sum;
-            for (size_t i = 0; i < num_rows; ++i)
+            for (size_t c = 0; c < num_classes; ++c)
             {
-                out(i, j) *= inv_sum;
+                out(b, c) *= inv_sum;
             }
         }
     }
 
-    void softmax_backward(const Matrix &out, const Matrix &grad_out,
-                          Matrix &grad_in)
+    void softmax_backward(const Tensor &out, const Tensor &grad_out,
+                          Tensor &grad_in)
     {
-        size_t num_classes = out.rows();
-        size_t batch_size = out.cols();
+        size_t batch_size = out.shape()[0];
+        size_t num_classes = out.shape()[1];
 
-        if (grad_in.rows() != num_classes || grad_in.cols() != batch_size)
+        if (grad_in.rank() != 2 || grad_in.shape()[0] != batch_size
+            || grad_in.shape()[1] != num_classes)
         {
-            grad_in.reshape(num_classes, batch_size);
+            grad_in.reshape(Shape({ batch_size, num_classes }));
         }
 
 #pragma omp parallel for
@@ -127,12 +127,12 @@ namespace Activation
             scalar_t dot = 0.0f;
             for (size_t k = 0; k < num_classes; ++k)
             {
-                dot += out(k, b) * grad_out(k, b);
+                dot += out(b, k) * grad_out(b, k);
             }
 
             for (size_t k = 0; k < num_classes; ++k)
             {
-                grad_in(k, b) = out(k, b) * (grad_out(k, b) - dot);
+                grad_in(b, k) = out(b, k) * (grad_out(b, k) - dot);
             }
         }
     }

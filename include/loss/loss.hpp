@@ -4,17 +4,17 @@
 #include <string>
 #include <vector>
 
-#include "utils/matrix.hpp"
+#include "utils/tensor.hpp"
 
 class Loss
 {
 public:
     virtual ~Loss() = default;
-    virtual scalar_t forward(const Matrix &predictions,
+    virtual scalar_t forward(const Tensor &predictions,
                              const std::vector<size_t> &targets) = 0;
-    virtual void backward(const Matrix &predictions,
+    virtual void backward(const Tensor &predictions,
                           const std::vector<size_t> &targets,
-                          Matrix &grad_output) = 0;
+                          Tensor &grad_output) = 0;
 
     virtual bool supports_fusion_with(const std::string &layer_type) const
     {
@@ -23,9 +23,9 @@ public:
     }
 
     virtual void backward_fused(const std::string &layer_type,
-                                const Matrix &probs,
+                                const Tensor &probs,
                                 const std::vector<size_t> &targets,
-                                Matrix &grad_logits)
+                                Tensor &grad_logits)
     {
         (void)layer_type;
         (void)probs;

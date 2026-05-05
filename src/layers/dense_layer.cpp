@@ -3,53 +3,68 @@
 #include <fstream>
 #include <stdexcept>
 
-#include "layers/activation/activation.hpp"
-
 DenseLayer::DenseLayer(size_t input_size, size_t output_size, std::mt19937 &gen)
     : input_size_(input_size)
     , output_size_(output_size)
-    , weights_(output_size, input_size)
-    , biases_(output_size, 1)
-    , activations_(output_size, 1)
-    , weights_grad_(output_size, input_size)
-    , biases_grad_(output_size, 1)
-    , weights_t_(input_size, output_size)
-    , input_t_(1, input_size)
-    , grad_input_(input_size, 1)
 {
+    weights_.reshape(Shape({ output_size_, input_size_ }));
+    biases_.reshape(Shape({ output_size_, 1 }));
+    weights_grad_.reshape(Shape({ output_size_, input_size_ }));
+    biases_grad_.reshape(Shape({ output_size_, 1 }));
+
     scalar_t std_dev = std::sqrt(2.0f / static_cast<scalar_t>(input_size));
     weights_.random_normal(std_dev, gen);
     biases_.fill(0.0f);
     clear_gradients();
 }
 
-const Matrix &DenseLayer::forward(const Matrix &input)
+const Tensor &DenseLayer::forward(const Tensor &input)
 {
-    size_t batch_size = input.cols();
+    size_t batch_size = input.shape()[0];
     input_ptr_ = &input;
 
-    if (activations_.cols() != batch_size)
+    if (activations_.rank() != 2 || activations_.shape()[0] != batch_size
+        || activations_.shape()[1] != output_size_)
     {
-        activations_.reshape(output_size_, batch_size);
-        grad_input_.reshape(input_size_, batch_size);
+        activations_.reshape(Shape({ batch_size, output_size_ }));
+        grad_input_.reshape(Shape({ batch_size, input_size_ }));
     }
 
-    Matrix::multiply(weights_, input, activations_);
-    activations_.add_broadcast(biases_);
+    Tensor::matmul(input, weights_, activations_, false, true);
+
+    scalar_t *act_ptr = activations_.data_ptr();
+    const scalar_t *bias_ptr = biases_.data_ptr();
+#pragma omp parallel for
+    for (size_t b = 0; b < batch_size; ++b)
+    {
+        for (size_t i = 0; i < output_size_; ++i)
+        {
+            act_ptr[b * output_size_ + i] += bias_ptr[i];
+        }
+    }
+
     return activations_;
 }
 
-const Matrix &DenseLayer::backward(const Matrix &gradient)
+const Tensor &DenseLayer::backward(const Tensor &gradient)
 {
-    Matrix::multiply_transA(weights_, gradient, grad_input_);
-    Matrix::multiply_transB(gradient, *input_ptr_, weights_grad_);
-    gradient.sum_columns(biases_grad_);
-    return grad_input_;
-}
+    size_t batch_size = gradient.shape()[0];
 
-std::vector<Parameter> DenseLayer::get_parameters()
-{
-    return { { &weights_, &weights_grad_ }, { &biases_, &biases_grad_ } };
+    Tensor::matmul(gradient, weights_, grad_input_, false, false);
+    Tensor::matmul(gradient, *input_ptr_, weights_grad_, true, false);
+
+    biases_grad_.fill(0.0f);
+    const scalar_t *grad_ptr = gradient.data_ptr();
+    scalar_t *bias_grad_ptr = biases_grad_.data_ptr();
+    for (size_t b = 0; b < batch_size; ++b)
+    {
+        for (size_t i = 0; i < output_size_; ++i)
+        {
+            bias_grad_ptr[i] += grad_ptr[b * output_size_ + i];
+        }
+    }
+
+    return grad_input_;
 }
 
 void DenseLayer::clear_gradients()
@@ -60,29 +75,33 @@ void DenseLayer::clear_gradients()
 
 void DenseLayer::save(std::ostream &os) const
 {
-    os.write(reinterpret_cast<const char *>(&input_size_), sizeof(input_size_));
-    os.write(reinterpret_cast<const char *>(&output_size_),
-             sizeof(output_size_));
+    uint32_t marker = make_marker("DNSL");
+    os.write(reinterpret_cast<const char *>(&marker), sizeof(marker));
+
+    uint64_t in_size = input_size_, out_size = output_size_;
+    os.write(reinterpret_cast<const char *>(&in_size), sizeof(in_size));
+    os.write(reinterpret_cast<const char *>(&out_size), sizeof(out_size));
+
     weights_.save(os);
     biases_.save(os);
 }
 
 void DenseLayer::load(std::istream &is)
 {
-    size_t in_size, out_size;
+    uint32_t marker;
+    is.read(reinterpret_cast<char *>(&marker), sizeof(marker));
+    if (marker != make_marker("DNSL"))
+        throw std::runtime_error("Architecture mismatch in DenseLayer load");
+
+    uint64_t in_size, out_size;
     is.read(reinterpret_cast<char *>(&in_size), sizeof(in_size));
     is.read(reinterpret_cast<char *>(&out_size), sizeof(out_size));
-    if (in_size != input_size_ || out_size != output_size_)
-    {
-        throw std::runtime_error("Arch mismatch in DenseLayer load");
-    }
+
+    input_size_ = in_size;
+    output_size_ = out_size;
+
     weights_.load(is);
     biases_.load(is);
-}
-
-const Matrix &DenseLayer::activations() const
-{
-    return activations_;
 }
 
 nlohmann::json DenseLayer::get_config() const

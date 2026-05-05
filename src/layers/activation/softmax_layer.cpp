@@ -1,17 +1,20 @@
 #include "layers/activation/softmax_layer.hpp"
+
 #include "layers/activation/activation.hpp"
 
-SoftmaxLayer::SoftmaxLayer() {}
+SoftmaxLayer::SoftmaxLayer()
+{}
 
-SoftmaxLayer::~SoftmaxLayer() {}
+SoftmaxLayer::~SoftmaxLayer()
+{}
 
-const Matrix &SoftmaxLayer::forward(const Matrix &input)
+const Tensor &SoftmaxLayer::forward(const Tensor &input)
 {
     Activation::softmax(input, output_);
     return output_;
 }
 
-const Matrix &SoftmaxLayer::backward(const Matrix &gradient)
+const Tensor &SoftmaxLayer::backward(const Tensor &gradient)
 {
     Activation::softmax_backward(output_, gradient, grad_input_);
     return grad_input_;
@@ -19,7 +22,7 @@ const Matrix &SoftmaxLayer::backward(const Matrix &gradient)
 
 nlohmann::json SoftmaxLayer::get_config() const
 {
-    return {{"type", "Softmax"}};
+    return { { "type", "Softmax" } };
 }
 
 Shape3D SoftmaxLayer::get_output_shape(const Shape3D &input_shape) const

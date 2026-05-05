@@ -1,33 +1,30 @@
 #pragma once
 
+#include <random>
 #include <vector>
 
 #include "layers/layer.hpp"
-#include "utils/matrix.hpp"
-#include "utils/tensor_batch.hpp"
 
 class PoolingLayer : public Layer
 {
-public:
-    static constexpr const char *LAYER_MARKER = "POOL";
-
 private:
+    size_t in_h_, in_w_, in_c_;
     size_t pool_size_;
     size_t stride_;
+    size_t out_h_, out_w_;
 
-    const Matrix *input_ptr_ = nullptr;
-    TensorBatch output_;
-    TensorBatch grad_input_;
-
+    const Tensor *input_ptr_ = nullptr;
+    Tensor output_;
+    Tensor grad_input_;
     std::vector<size_t> argmax_indices_;
 
 public:
-    PoolingLayer(size_t input_rows, size_t input_cols, size_t filter_count,
-                 size_t pool_size, size_t stride);
+    PoolingLayer(size_t input_h, size_t input_w, size_t input_c,
+                 size_t pool_size, size_t stride = 2);
     ~PoolingLayer() override = default;
 
-    const Matrix &forward(const Matrix &input) override;
-    const Matrix &backward(const Matrix &gradient) override;
+    const Tensor &forward(const Tensor &input) override;
+    const Tensor &backward(const Tensor &gradient) override;
 
     void save(std::ostream &os) const override;
     void load(std::istream &is) override;

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "layers/layer.hpp"
-#include "utils/matrix.hpp"
 
 class SigmoidLayer : public Layer
 {
@@ -9,15 +8,15 @@ public:
     static constexpr const char *LAYER_MARKER = "SIGM";
 
 private:
-    Matrix output_;
-    Matrix grad_input_;
+    Tensor output_;
+    Tensor grad_input_;
 
 public:
     SigmoidLayer();
     ~SigmoidLayer() override = default;
 
-    const Matrix &forward(const Matrix &input) override;
-    const Matrix &backward(const Matrix &gradient) override;
+    const Tensor &forward(const Tensor &input) override;
+    const Tensor &backward(const Tensor &gradient) override;
 
     void save(std::ostream &os) const override;
     void load(std::istream &is) override;

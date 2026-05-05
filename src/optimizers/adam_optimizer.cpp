@@ -9,17 +9,18 @@ AdamOptimizer::AdamOptimizer(scalar_t learning_rate, scalar_t beta1,
     , t_(0)
 {}
 
-void AdamOptimizer::add_parameters(const std::vector<Parameter> &params)
+void AdamOptimizer::set_parameters(const std::vector<Tensor *> &weights,
+                                   const std::vector<Tensor *> &grads)
 {
-    size_t start_idx = parameters_.size();
-    Optimizer::add_parameters(params);
-    for (size_t i = start_idx; i < parameters_.size(); ++i)
+    Optimizer::set_parameters(weights, grads);
+    m_.clear();
+    v_.clear();
+    for (auto *w : weights)
     {
-        auto &param = parameters_[i];
-        if (param.value && param.gradient)
+        if (w)
         {
-            m_.emplace_back(param.value->rows(), param.value->cols());
-            v_.emplace_back(param.value->rows(), param.value->cols());
+            m_.emplace_back(w->shape(), 0.0f);
+            v_.emplace_back(w->shape(), 0.0f);
         }
         else
         {
@@ -37,17 +38,16 @@ void AdamOptimizer::step()
     scalar_t m_corr = 1.0f / (1.0f - beta1_t);
     scalar_t v_corr = 1.0f / (1.0f - beta2_t);
 
-    for (size_t i = 0; i < parameters_.size(); ++i)
+    for (size_t i = 0; i < weights_.size(); ++i)
     {
-        auto &param = parameters_[i];
-        if (!param.value || !param.gradient)
+        if (!weights_[i] || !gradients_[i])
             continue;
 
-        size_t total = param.value->size();
-        scalar_t *w_ptr = param.value->data();
-        scalar_t *wg_ptr = param.gradient->data();
-        scalar_t *mw_ptr = m_[i].data();
-        scalar_t *vw_ptr = v_[i].data();
+        size_t total = weights_[i]->size();
+        scalar_t *w_ptr = weights_[i]->data().data();
+        scalar_t *wg_ptr = gradients_[i]->data().data();
+        scalar_t *mw_ptr = m_[i].data().data();
+        scalar_t *vw_ptr = v_[i].data().data();
 
 #pragma omp parallel for if (total > 1000)
         for (size_t j = 0; j < total; ++j)

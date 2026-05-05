@@ -5,22 +5,25 @@
 #include <nlohmann/json.hpp>
 #include <vector>
 
-#include "utils/matrix.hpp"
-#include "utils/types.hpp"
+#include "utils/tensor.hpp"
 
 class Layer
 {
 public:
     virtual ~Layer() = default;
-    virtual const Matrix &forward(const Matrix &input) = 0;
-    virtual const Matrix &backward(const Matrix &gradient) = 0;
+    virtual const Tensor &forward(const Tensor &input) = 0;
+    virtual const Tensor &backward(const Tensor &gradient) = 0;
 
     virtual void clear_gradients()
     {}
     virtual void set_training(bool /*training*/)
     {}
 
-    virtual std::vector<Parameter> get_parameters()
+    virtual std::vector<Tensor *> get_weights()
+    {
+        return {};
+    }
+    virtual std::vector<Tensor *> get_gradients()
     {
         return {};
     }

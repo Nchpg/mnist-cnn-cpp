@@ -3,22 +3,22 @@
 #include <algorithm>
 #include <vector>
 
-#include "utils/matrix.hpp"
+#include "utils/tensor.hpp"
 
 namespace Utils
 {
-    inline std::vector<size_t> argmax(const Matrix &m)
+    inline std::vector<size_t> argmax(const Tensor &m)
     {
-        std::vector<size_t> results(m.cols());
-        for (size_t j = 0; j < m.cols(); ++j)
+        std::vector<size_t> results(m.shape()[0]);
+        for (size_t b = 0; b < m.shape()[0]; ++b)
         {
             size_t best = 0;
-            for (size_t i = 1; i < m.rows(); ++i)
+            for (size_t c = 1; c < m.shape()[1]; ++c)
             {
-                if (m(i, j) > m(best, j))
-                    best = i;
+                if (m(b, c) > m(b, best))
+                    best = c;
             }
-            results[j] = best;
+            results[b] = best;
         }
         return results;
     }

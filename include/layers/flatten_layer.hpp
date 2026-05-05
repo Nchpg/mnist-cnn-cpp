@@ -1,26 +1,25 @@
 #pragma once
 
-#include <algorithm>
-#include <stdexcept>
-#include <string>
-
 #include "layers/layer.hpp"
 
 class FlattenLayer : public Layer
 {
-public:
-    static constexpr const char *LAYER_MARKER = "FLAT";
+private:
+    size_t input_channels_;
+    size_t input_height_;
+    size_t input_width_;
+
+    Tensor output_;
+    Tensor grad_input_;
 
 public:
-    FlattenLayer();
+    FlattenLayer(size_t channels, size_t height, size_t width);
     ~FlattenLayer() override = default;
 
-    const Matrix &forward(const Matrix &input) override;
-
-    const Matrix &backward(const Matrix &gradient) override;
+    const Tensor &forward(const Tensor &input) override;
+    const Tensor &backward(const Tensor &gradient) override;
 
     void save(std::ostream &os) const override;
-
     void load(std::istream &is) override;
 
     nlohmann::json get_config() const override;

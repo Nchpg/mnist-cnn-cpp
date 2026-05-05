@@ -4,48 +4,52 @@
 #include <vector>
 
 #include "layers/layer.hpp"
-#include "utils/matrix.hpp"
-#include "utils/tensor_batch.hpp"
 
 class ConvLayer : public Layer
 {
-public:
-    static constexpr const char *LAYER_NAME = "CONV";
-
 private:
-    size_t kernel_size_;
-    Matrix biases_;
-    Matrix biases_grad_;
+    size_t in_h_, in_w_, in_c_;
+    size_t k_size_;
+    size_t out_c_;
+    size_t out_h_, out_w_;
 
-    const Matrix *input_ptr_ = nullptr;
-    TensorBatch output_;
-    TensorBatch grad_input_;
+    Tensor filters_;
+    Tensor biases_;
 
-    Matrix filters_matrix_;
-    Matrix filters_grad_matrix_;
+    Tensor filters_grad_;
+    Tensor biases_grad_;
 
-    Matrix im2col_buffer_;
-    Matrix gemm_out_;
-    Matrix grad_col_buffer_;
+    const Tensor *input_ptr_ = nullptr;
+    Tensor output_;
+    Tensor grad_input_;
 
-    void im2col(const Matrix &input, Matrix &out_col);
-    void col2im(const Matrix &grad_col, TensorBatch &grad_input);
+    Tensor col_buffer_;
+    Tensor grad_view_;
+    Tensor temp_filter_grad_;
+    Tensor grad_col_;
+    Tensor gemm_out_;
 
 public:
-    ConvLayer(size_t input_rows, size_t input_cols, size_t input_channels,
-              size_t kernel_size, size_t filter_count, std::mt19937 &gen,
-              scalar_t weight_scale = 0.01f);
+    ConvLayer(size_t input_h, size_t input_w, size_t input_c,
+              size_t kernel_size, size_t filter_count, std::mt19937 &gen);
     ~ConvLayer() override = default;
 
-    const Matrix &forward(const Matrix &input) override;
-    const Matrix &backward(const Matrix &gradient) override;
+    const Tensor &forward(const Tensor &input) override;
+    const Tensor &backward(const Tensor &gradient) override;
 
     void clear_gradients() override;
 
-    std::vector<Parameter> get_parameters() override;
-
     void save(std::ostream &os) const override;
     void load(std::istream &is) override;
+
+    std::vector<Tensor *> get_weights() override
+    {
+        return { &filters_, &biases_ };
+    }
+    std::vector<Tensor *> get_gradients() override
+    {
+        return { &filters_grad_, &biases_grad_ };
+    }
 
     nlohmann::json get_config() const override;
 

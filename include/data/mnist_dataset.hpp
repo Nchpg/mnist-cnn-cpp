@@ -4,7 +4,7 @@
 
 #include "data/constants.hpp"
 #include "data/dataset.hpp"
-#include "utils/matrix.hpp"
+#include "utils/tensor.hpp"
 
 class MnistDataset : public Dataset
 {
@@ -60,13 +60,14 @@ public:
     {
         return count_;
     }
-    Matrix image(size_t index) const
+    Tensor image(size_t index) const
     {
         if (index >= count_)
             throw std::out_of_range("Image index out of range");
-        Matrix img(PIXELS, 1);
+        Tensor img(Shape({ PIXELS, 1 }), 0.0f);
         std::copy(all_images_data_.begin() + index * PIXELS,
-                  all_images_data_.begin() + (index + 1) * PIXELS, img.data());
+                  all_images_data_.begin() + (index + 1) * PIXELS,
+                  img.data_ptr());
         return img;
     }
     unsigned char label(size_t index) const
@@ -79,7 +80,7 @@ public:
     void shuffle_indices();
 
     void get_batch_images(size_t start_idx, size_t batch_size,
-                          Matrix &out_batch) const;
+                          Tensor &out_batch) const;
     void get_batch_labels(size_t start_idx, size_t batch_size,
                           std::vector<size_t> &out_labels) const;
 };

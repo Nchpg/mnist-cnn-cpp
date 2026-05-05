@@ -1,15 +1,17 @@
 #include "layers/activation/sigmoid_layer.hpp"
+
 #include "layers/activation/activation.hpp"
 
-SigmoidLayer::SigmoidLayer() {}
+SigmoidLayer::SigmoidLayer()
+{}
 
-const Matrix &SigmoidLayer::forward(const Matrix &input)
+const Tensor &SigmoidLayer::forward(const Tensor &input)
 {
     Activation::sigmoid(input, output_);
     return output_;
 }
 
-const Matrix &SigmoidLayer::backward(const Matrix &gradient)
+const Tensor &SigmoidLayer::backward(const Tensor &gradient)
 {
     Activation::sigmoid_backward(output_, gradient, grad_input_);
     return grad_input_;
@@ -31,7 +33,7 @@ void SigmoidLayer::load(std::istream &is)
 
 nlohmann::json SigmoidLayer::get_config() const
 {
-    return {{"type", "Sigmoid"}};
+    return { { "type", "Sigmoid" } };
 }
 
 Shape3D SigmoidLayer::get_output_shape(const Shape3D &input_shape) const

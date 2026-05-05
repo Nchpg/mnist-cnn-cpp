@@ -165,22 +165,23 @@ void MnistDataset::shuffle_indices()
 }
 
 void MnistDataset::get_batch_images(size_t start_idx, size_t batch_size,
-                                    Matrix &out_batch) const
+                                    Tensor &out_batch) const
 {
     if (start_idx + batch_size > count_)
         batch_size = count_ - start_idx;
-    if (out_batch.rows() != PIXELS || out_batch.cols() != batch_size)
+    if (out_batch.rank() != 2 || out_batch.shape()[0] != batch_size
+        || out_batch.shape()[1] != PIXELS)
     {
-        out_batch.reshape(PIXELS, batch_size);
+        out_batch.reshape(Shape({ batch_size, PIXELS }));
     }
 
 #pragma omp parallel for
-    for (size_t i = 0; i < PIXELS; ++i)
+    for (size_t b = 0; b < batch_size; ++b)
     {
-        for (size_t b = 0; b < batch_size; ++b)
+        size_t img_idx = indices_[start_idx + b];
+        for (size_t i = 0; i < PIXELS; ++i)
         {
-            size_t img_idx = indices_[start_idx + b];
-            out_batch(i, b) = all_images_data_[img_idx * PIXELS + i];
+            out_batch(b, i) = all_images_data_[img_idx * PIXELS + i];
         }
     }
 }

@@ -1,0 +1,213 @@
+#include "utils/tensor.hpp"
+
+#include <algorithm>
+#include <cstring>
+
+void Tensor::compute_strides()
+{
+    strides_.resize(shape_.rank());
+    size_t stride = 1;
+    for (int i = static_cast<int>(shape_.rank()) - 1; i >= 0; --i)
+    {
+        strides_[i] = stride;
+        stride *= shape_[i];
+    }
+}
+
+Tensor::Tensor(Shape shape, scalar_t init_val)
+    : shape_(shape)
+    , data_(shape.size(), init_val)
+{
+    compute_strides();
+}
+
+Tensor::Tensor(std::initializer_list<size_t> dims, scalar_t init_val)
+    : shape_(Shape(std::vector<size_t>(dims)))
+    , data_(shape_.size(), init_val)
+{
+    compute_strides();
+}
+
+void Tensor::reshape(Shape new_shape)
+{
+    if (new_shape.size() != shape_.size())
+    {
+        data_.resize(new_shape.size());
+    }
+    shape_ = new_shape;
+    compute_strides();
+}
+
+void Tensor::reshape(Shape new_shape, scalar_t init_val)
+{
+    if (new_shape.size() != shape_.size())
+    {
+        data_.resize(new_shape.size(), init_val);
+    }
+    shape_ = new_shape;
+    compute_strides();
+}
+
+void Tensor::fill(scalar_t value)
+{
+    std::fill(data_.begin(), data_.end(), value);
+}
+
+void Tensor::random_uniform(scalar_t scale, std::mt19937 &gen)
+{
+    std::uniform_real_distribution<scalar_t> dist(-scale, scale);
+    for (auto &val : data_)
+        val = dist(gen);
+}
+
+void Tensor::random_normal(scalar_t std_dev, std::mt19937 &gen)
+{
+    std::normal_distribution<scalar_t> dist(0.0f, std_dev);
+    for (auto &val : data_)
+        val = dist(gen);
+}
+
+Tensor &Tensor::operator+=(const Tensor &other)
+{
+    if (shape_ != other.shape_)
+    {
+        throw std::invalid_argument("Shapes mismatch in operator+=");
+    }
+    size_t n = data_.size();
+#pragma omp parallel for if (n > 10000)
+    for (size_t i = 0; i < n; ++i)
+        data_[i] += other.data_[i];
+    return *this;
+}
+
+Tensor &Tensor::operator-=(const Tensor &other)
+{
+    if (shape_ != other.shape_)
+    {
+        throw std::invalid_argument("Shapes mismatch in operator-=");
+    }
+    size_t n = data_.size();
+#pragma omp parallel for if (n > 10000)
+    for (size_t i = 0; i < n; ++i)
+        data_[i] -= other.data_[i];
+    return *this;
+}
+
+void Tensor::add_scaled(const Tensor &other, scalar_t scale)
+{
+    size_t n = data_.size();
+#pragma omp parallel for if (n > 10000)
+    for (size_t i = 0; i < n; ++i)
+        data_[i] += other.data_[i] * scale;
+}
+
+void Tensor::matmul(const Tensor &A, const Tensor &B, Tensor &C, bool transA,
+                    bool transB)
+{
+    size_t M = transA ? A.shape()[1] : A.shape()[0];
+    size_t K_A = transA ? A.shape()[0] : A.shape()[1];
+    size_t K_B = transB ? B.shape()[1] : B.shape()[0];
+    size_t N = transB ? B.shape()[0] : B.shape()[1];
+
+    if (K_A != K_B)
+    {
+        throw std::invalid_argument("Matmul: dimension mismatch");
+    }
+    size_t K = K_A;
+
+    if (C.rank() != 2 || C.shape()[0] != M || C.shape()[1] != N)
+        C.reshape(Shape({ M, N }));
+    C.fill(0.0f);
+
+    scalar_t *C_ptr = C.data_ptr();
+    const scalar_t *A_ptr = A.data_ptr();
+    const scalar_t *B_ptr = B.data_ptr();
+    size_t lda = A.shape()[1];
+    size_t ldb = B.shape()[1];
+    size_t ldc = C.shape()[1];
+
+    if (!transB)
+    {
+#pragma omp parallel for if (M * N * K > 5000)
+        for (size_t i = 0; i < M; ++i)
+        {
+            for (size_t k = 0; k < K; ++k)
+            {
+                size_t a_idx = transA ? k * lda + i : i * lda + k;
+                scalar_t a_val = A_ptr[a_idx];
+                if (a_val == 0.0f)
+                    continue;
+                for (size_t j = 0; j < N; ++j)
+                {
+                    C_ptr[i * ldc + j] += a_val * B_ptr[k * ldb + j];
+                }
+            }
+        }
+    }
+    else
+    {
+#pragma omp parallel for if (M * N * K > 5000)
+        for (size_t i = 0; i < M; ++i)
+        {
+            for (size_t j = 0; j < N; ++j)
+            {
+                scalar_t sum = 0.0f;
+                for (size_t k = 0; k < K; ++k)
+                {
+                    size_t a_idx = transA ? k * lda + i : i * lda + k;
+                    sum += A_ptr[a_idx] * B_ptr[j * ldb + k];
+                }
+                C_ptr[i * ldc + j] = sum;
+            }
+        }
+    }
+}
+
+scalar_t &Tensor::operator()(size_t n, size_t c, size_t h, size_t w)
+{
+    return data_[((n * shape_[1] + c) * shape_[2] + h) * shape_[3] + w];
+}
+
+const scalar_t &Tensor::operator()(size_t n, size_t c, size_t h, size_t w) const
+{
+    return data_[((n * shape_[1] + c) * shape_[2] + h) * shape_[3] + w];
+}
+
+scalar_t &Tensor::operator()(size_t i, size_t j)
+{
+    return data_[i * strides_[0] + j];
+}
+
+const scalar_t &Tensor::operator()(size_t i, size_t j) const
+{
+    return data_[i * strides_[0] + j];
+}
+
+void Tensor::save(std::ostream &os) const
+{
+    uint64_t r = rank();
+    os.write(reinterpret_cast<const char *>(&r), sizeof(r));
+    for (size_t d : shape_.dims())
+    {
+        uint64_t dim = d;
+        os.write(reinterpret_cast<const char *>(&dim), sizeof(dim));
+    }
+    os.write(reinterpret_cast<const char *>(data_.data()),
+             data_.size() * sizeof(scalar_t));
+}
+
+void Tensor::load(std::istream &is)
+{
+    uint64_t r;
+    is.read(reinterpret_cast<char *>(&r), sizeof(r));
+    std::vector<size_t> dims(r);
+    for (size_t i = 0; i < r; ++i)
+    {
+        uint64_t d;
+        is.read(reinterpret_cast<char *>(&d), sizeof(d));
+        dims[i] = d;
+    }
+    reshape(Shape(dims));
+    is.read(reinterpret_cast<char *>(data_.data()),
+            data_.size() * sizeof(scalar_t));
+}

@@ -1,42 +1,34 @@
 #include "layers/batchnorm_layer.hpp"
 
-#include <cmath>
-#include <fstream>
-#include <omp.h>
-#include <stdexcept>
-
 BatchNormLayer::BatchNormLayer(size_t channels, size_t spatial_size)
     : channels_(channels)
     , spatial_size_(spatial_size)
-    , gamma_(channels, 1, 1.0f)
-    , beta_(channels, 1, 0.0f)
-    , grad_gamma_(channels, 1)
-    , grad_beta_(channels, 1)
-    , running_mean_(channels, 1, 0.0f)
-    , running_var_(channels, 1, 1.0f)
-    , saved_mean_(channels, 1)
-    , saved_var_(channels, 1)
-    , normalized_()
-    , output_()
 {
+    gamma_.reshape(Shape({ channels, 1 }), 1.0f);
+    beta_.reshape(Shape({ channels, 1 }), 0.0f);
+    grad_gamma_.reshape(Shape({ channels, 1 }));
+    grad_beta_.reshape(Shape({ channels, 1 }));
+    running_mean_.reshape(Shape({ channels, 1 }), 0.0f);
+    running_var_.reshape(Shape({ channels, 1 }), 1.0f);
+    saved_mean_.reshape(Shape({ channels, 1 }));
+    saved_var_.reshape(Shape({ channels, 1 }));
     clear_gradients();
 }
 
-const Matrix &BatchNormLayer::forward(const Matrix &input)
+const Tensor &BatchNormLayer::forward(const Tensor &input)
 {
-    if (input.rows() != channels_ * spatial_size_)
-    {
-        throw std::invalid_argument("BatchNormLayer: input rows mismatch");
-    }
-    size_t batch_size = input.cols();
+    size_t batch_size = input.shape()[0];
     input_ptr_ = &input;
 
-    if (normalized_.cols() != batch_size || normalized_.rows() != input.rows())
+    if (normalized_.shape().rank() == 0 || normalized_.shape()[0] != batch_size)
     {
-        normalized_.reshape(input.rows(), batch_size);
-        output_.reshape(input.rows(), batch_size);
+        normalized_.reshape(input.shape());
+        output_.reshape(input.shape());
+        grad_input_.reshape(input.shape());
     }
 
+    size_t height = input.shape()[2];
+    size_t width = input.shape()[3];
     scalar_t N = static_cast<scalar_t>(spatial_size_ * batch_size);
 
 #pragma omp parallel for if (channels_ > 1)
@@ -45,24 +37,28 @@ const Matrix &BatchNormLayer::forward(const Matrix &input)
         if (is_training_)
         {
             scalar_t sum = 0.0f;
-            for (size_t s = 0; s < spatial_size_; ++s)
+            for (size_t b = 0; b < batch_size; ++b)
             {
-                size_t row = c * spatial_size_ + s;
-                for (size_t b = 0; b < batch_size; ++b)
+                for (size_t y = 0; y < height; ++y)
                 {
-                    sum += input(row, b);
+                    for (size_t x = 0; x < width; ++x)
+                    {
+                        sum += input(b, c, y, x);
+                    }
                 }
             }
             saved_mean_(c, 0) = sum / N;
 
             scalar_t var_sum = 0.0f;
-            for (size_t s = 0; s < spatial_size_; ++s)
+            for (size_t b = 0; b < batch_size; ++b)
             {
-                size_t row = c * spatial_size_ + s;
-                for (size_t b = 0; b < batch_size; ++b)
+                for (size_t y = 0; y < height; ++y)
                 {
-                    scalar_t diff = input(row, b) - saved_mean_(c, 0);
-                    var_sum += diff * diff;
+                    for (size_t x = 0; x < width; ++x)
+                    {
+                        scalar_t diff = input(b, c, y, x) - saved_mean_(c, 0);
+                        var_sum += diff * diff;
+                    }
                 }
             }
             saved_var_(c, 0) = var_sum / N;
@@ -87,14 +83,16 @@ const Matrix &BatchNormLayer::forward(const Matrix &input)
         scalar_t gamma_c = gamma_(c, 0);
         scalar_t beta_c = beta_(c, 0);
 
-        for (size_t s = 0; s < spatial_size_; ++s)
+        for (size_t b = 0; b < batch_size; ++b)
         {
-            size_t row = c * spatial_size_ + s;
-            for (size_t b = 0; b < batch_size; ++b)
+            for (size_t y = 0; y < height; ++y)
             {
-                scalar_t x_hat = (input(row, b) - mean_to_use) * std_inv;
-                normalized_(row, b) = x_hat;
-                output_(row, b) = x_hat * gamma_c + beta_c;
+                for (size_t x = 0; x < width; ++x)
+                {
+                    scalar_t x_hat = (input(b, c, y, x) - mean_to_use) * std_inv;
+                    normalized_(b, c, y, x) = x_hat;
+                    output_(b, c, y, x) = x_hat * gamma_c + beta_c;
+                }
             }
         }
     }
@@ -102,9 +100,11 @@ const Matrix &BatchNormLayer::forward(const Matrix &input)
     return output_;
 }
 
-const Matrix &BatchNormLayer::backward(const Matrix &gradient)
+const Tensor &BatchNormLayer::backward(const Tensor &gradient)
 {
-    size_t batch_size = normalized_.cols();
+    size_t batch_size = gradient.shape()[0];
+    size_t height = gradient.shape()[2];
+    size_t width = gradient.shape()[3];
     scalar_t N = static_cast<scalar_t>(spatial_size_ * batch_size);
 
 #pragma omp parallel for if (channels_ > 1)
@@ -113,14 +113,16 @@ const Matrix &BatchNormLayer::backward(const Matrix &gradient)
         scalar_t sum_dy = 0.0f;
         scalar_t sum_dy_xhat = 0.0f;
 
-        for (size_t s = 0; s < spatial_size_; ++s)
+        for (size_t b = 0; b < batch_size; ++b)
         {
-            size_t row = c * spatial_size_ + s;
-            for (size_t b = 0; b < batch_size; ++b)
+            for (size_t y = 0; y < height; ++y)
             {
-                scalar_t dy = gradient(row, b);
-                sum_dy += dy;
-                sum_dy_xhat += dy * normalized_(row, b);
+                for (size_t x = 0; x < width; ++x)
+                {
+                    scalar_t dy = gradient(b, c, y, x);
+                    sum_dy += dy;
+                    sum_dy_xhat += dy * normalized_(b, c, y, x);
+                }
             }
         }
 
@@ -131,27 +133,24 @@ const Matrix &BatchNormLayer::backward(const Matrix &gradient)
         scalar_t std_inv = 1.0f / std::sqrt(saved_var_(c, 0) + epsilon_);
         scalar_t coef = gamma_c * std_inv;
 
-        for (size_t s = 0; s < spatial_size_; ++s)
+        for (size_t b = 0; b < batch_size; ++b)
         {
-            size_t row = c * spatial_size_ + s;
-            for (size_t b = 0; b < batch_size; ++b)
+            for (size_t y = 0; y < height; ++y)
             {
-                scalar_t dy = gradient(row, b);
-                scalar_t x_hat = normalized_(row, b);
+                for (size_t x = 0; x < width; ++x)
+                {
+                    scalar_t dy = gradient(b, c, y, x);
+                    scalar_t x_hat = normalized_(b, c, y, x);
 
-                scalar_t dx =
-                    coef * (dy - (sum_dy / N) - x_hat * (sum_dy_xhat / N));
-                output_(row, b) = dx;
+                    scalar_t dx =
+                        coef * (dy - (sum_dy / N) - x_hat * (sum_dy_xhat / N));
+                    grad_input_(b, c, y, x) = dx;
+                }
             }
         }
     }
 
-    return output_;
-}
-
-std::vector<Parameter> BatchNormLayer::get_parameters()
-{
-    return { { &gamma_, &grad_gamma_ }, { &beta_, &grad_beta_ } };
+    return grad_input_;
 }
 
 void BatchNormLayer::clear_gradients()
@@ -160,43 +159,40 @@ void BatchNormLayer::clear_gradients()
     grad_beta_.fill(0.0f);
 }
 
-void BatchNormLayer::set_training(bool training)
-{
-    is_training_ = training;
-}
-
 void BatchNormLayer::save(std::ostream &os) const
 {
-    os.write(reinterpret_cast<const char *>(&channels_), sizeof(channels_));
-    os.write(reinterpret_cast<const char *>(&spatial_size_),
-             sizeof(spatial_size_));
-    os.write(reinterpret_cast<const char *>(gamma_.data()),
-             channels_ * sizeof(scalar_t));
-    os.write(reinterpret_cast<const char *>(beta_.data()),
-             channels_ * sizeof(scalar_t));
-    os.write(reinterpret_cast<const char *>(running_mean_.data()),
-             channels_ * sizeof(scalar_t));
-    os.write(reinterpret_cast<const char *>(running_var_.data()),
-             channels_ * sizeof(scalar_t));
+    uint32_t marker = make_marker("BNRM");
+    os.write(reinterpret_cast<const char *>(&marker), sizeof(marker));
+
+    uint64_t channels = channels_, spatial_size = spatial_size_;
+    os.write(reinterpret_cast<const char *>(&channels), sizeof(channels));
+    os.write(reinterpret_cast<const char *>(&spatial_size),
+             sizeof(spatial_size));
+
+    gamma_.save(os);
+    beta_.save(os);
+    running_mean_.save(os);
+    running_var_.save(os);
 }
 
 void BatchNormLayer::load(std::istream &is)
 {
-    size_t channels, spatial;
-    is.read(reinterpret_cast<char *>(&channels), sizeof(channels));
-    is.read(reinterpret_cast<char *>(&spatial), sizeof(spatial));
-    if (channels != channels_ || spatial != spatial_size_)
-    {
+    uint32_t marker;
+    is.read(reinterpret_cast<char *>(&marker), sizeof(marker));
+    if (marker != make_marker("BNRM"))
         throw std::runtime_error("Arch mismatch in BatchNormLayer load");
-    }
-    is.read(reinterpret_cast<char *>(gamma_.data()),
-            channels_ * sizeof(scalar_t));
-    is.read(reinterpret_cast<char *>(beta_.data()),
-            channels_ * sizeof(scalar_t));
-    is.read(reinterpret_cast<char *>(running_mean_.data()),
-            channels_ * sizeof(scalar_t));
-    is.read(reinterpret_cast<char *>(running_var_.data()),
-            channels_ * sizeof(scalar_t));
+
+    uint64_t channels, spatial_size;
+    is.read(reinterpret_cast<char *>(&channels), sizeof(channels));
+    is.read(reinterpret_cast<char *>(&spatial_size), sizeof(spatial_size));
+
+    channels_ = channels;
+    spatial_size_ = spatial_size;
+
+    gamma_.load(is);
+    beta_.load(is);
+    running_mean_.load(is);
+    running_var_.load(is);
 }
 
 nlohmann::json BatchNormLayer::get_config() const

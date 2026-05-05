@@ -6,11 +6,11 @@ SGDOptimizer::SGDOptimizer(scalar_t learning_rate)
 
 void SGDOptimizer::step()
 {
-    for (auto &param : parameters_)
+    for (size_t i = 0; i < weights_.size(); ++i)
     {
-        if (param.value && param.gradient)
+        if (weights_[i] && gradients_[i])
         {
-            param.value->subtract_scaled(*param.gradient, learning_rate());
+            weights_[i]->add_scaled(*gradients_[i], -learning_rate());
         }
     }
 }

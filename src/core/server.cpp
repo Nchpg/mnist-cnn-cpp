@@ -62,7 +62,7 @@ static void send_response(int client_fd, const std::string &status,
     send(client_fd, response.data(), response.length(), 0);
 }
 
-static bool parse_pixels(const std::string &body, Matrix &image)
+static bool parse_pixels(const std::string &body, Tensor &image)
 {
     size_t start = body.find('[');
     if (start == std::string::npos)
@@ -109,7 +109,7 @@ static bool parse_pixels(const std::string &body, Matrix &image)
 
 static void handle_predict(int client_fd, CNN &cnn, const std::string &body)
 {
-    Matrix image(PIXELS, 1);
+    Tensor image(Shape({ PIXELS, 1 }), 0.0f);
     if (!parse_pixels(body, image))
     {
         send_response(client_fd, "400 Bad Request", "text/plain",
@@ -237,7 +237,8 @@ int main(int argc, char **argv)
         FD_ZERO(&read_fds);
         FD_SET(server_fd, &read_fds);
 
-        int select_result = select(server_fd + 1, &read_fds, nullptr, nullptr, &tv);
+        int select_result =
+            select(server_fd + 1, &read_fds, nullptr, nullptr, &tv);
         if (select_result <= 0)
             continue;
 

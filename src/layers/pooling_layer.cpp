@@ -1,56 +1,43 @@
 #include "layers/pooling_layer.hpp"
 
 #include <limits>
-#include <omp.h>
-#include <stdexcept>
 
-PoolingLayer::PoolingLayer(size_t input_rows, size_t input_cols,
-                           size_t filter_count, size_t pool_size, size_t stride)
-    : pool_size_(pool_size)
+PoolingLayer::PoolingLayer(size_t input_h, size_t input_w, size_t input_c,
+                           size_t pool_size, size_t stride)
+    : in_h_(input_h)
+    , in_w_(input_w)
+    , in_c_(input_c)
+    , pool_size_(pool_size)
     , stride_(stride)
 {
-    size_t out_rows = (input_rows - pool_size) / stride + 1;
-    size_t out_cols = (input_cols - pool_size) / stride + 1;
-
-    output_ = TensorBatch(filter_count, out_rows, out_cols, 1);
-    grad_input_ = TensorBatch(filter_count, input_rows, input_cols, 1);
-
-    argmax_indices_.resize(1 * filter_count * out_rows * out_cols, 0);
+    out_h_ = (input_h - pool_size) / stride + 1;
+    out_w_ = (input_w - pool_size) / stride + 1;
 }
 
-const Matrix &PoolingLayer::forward(const Matrix &input)
+const Tensor &PoolingLayer::forward(const Tensor &input)
 {
-    size_t batch_size = input.cols();
+    size_t batch_size = input.shape()[0];
     input_ptr_ = &input;
 
-    if (output_.batch_size() != batch_size)
+    if (output_.shape().rank() == 0 || output_.shape()[0] != batch_size)
     {
-        output_.reshape4D(output_.channels(), output_.height(), output_.width(),
-                          batch_size);
-        grad_input_.reshape4D(grad_input_.channels(), grad_input_.height(),
-                              grad_input_.width(), batch_size);
-        argmax_indices_.resize(output_.rows() * batch_size, 0);
+        output_.reshape(Shape({ batch_size, in_c_, out_h_, out_w_ }));
+        grad_input_.reshape(input.shape());
+        argmax_indices_.resize(output_.size());
     }
 
-    const size_t channels = output_.channels();
-    const size_t out_h = output_.height();
-    const size_t out_w = output_.width();
-    const size_t in_h = grad_input_.height();
-    const size_t in_w = grad_input_.width();
-
-#pragma omp parallel for collapse(2) if (channels * out_h > 4)
-    for (size_t c = 0; c < channels; ++c)
+#pragma omp parallel for collapse(2)
+    for (size_t b = 0; b < batch_size; ++b)
     {
-        for (size_t i = 0; i < out_h; ++i)
+        for (size_t c = 0; c < in_c_; ++c)
         {
-            for (size_t j = 0; j < out_w; ++j)
+            for (size_t i = 0; i < out_h_; ++i)
             {
-                size_t start_r = i * stride_;
-                size_t start_c = j * stride_;
-                size_t out_row = (c * out_h + i) * out_w + j;
-
-                for (size_t b = 0; b < batch_size; ++b)
+                for (size_t j = 0; j < out_w_; ++j)
                 {
+                    size_t start_r = i * stride_;
+                    size_t start_c = j * stride_;
+
                     scalar_t max_val =
                         -std::numeric_limits<scalar_t>::infinity();
                     size_t max_idx = 0;
@@ -62,19 +49,18 @@ const Matrix &PoolingLayer::forward(const Matrix &input)
                             size_t in_r = start_r + ki;
                             size_t in_c = start_c + kj;
 
-                            size_t in_row = (c * in_h + in_r) * in_w + in_c;
-                            scalar_t val = input(in_row, b);
-
+                            scalar_t val = input(b, c, in_r, in_c);
                             if (val > max_val)
                             {
                                 max_val = val;
-                                max_idx = in_row;
+                                max_idx = in_r * in_w_ + in_c;
                             }
                         }
                     }
-
                     output_(b, c, i, j) = max_val;
-                    argmax_indices_[out_row * batch_size + b] = max_idx;
+                    size_t out_idx =
+                        ((b * in_c_ + c) * out_h_ + i) * out_w_ + j;
+                    argmax_indices_[out_idx] = max_idx;
                 }
             }
         }
@@ -83,20 +69,29 @@ const Matrix &PoolingLayer::forward(const Matrix &input)
     return output_;
 }
 
-const Matrix &PoolingLayer::backward(const Matrix &gradient)
+const Tensor &PoolingLayer::backward(const Tensor &gradient)
 {
     grad_input_.fill(0.0f);
-    size_t batch_size = output_.batch_size();
-    size_t num_out_rows = output_.rows();
+    size_t batch_size = gradient.shape()[0];
 
-#pragma omp parallel for if (batch_size > 1)
+#pragma omp parallel for collapse(2)
     for (size_t b = 0; b < batch_size; ++b)
     {
-        for (size_t r = 0; r < num_out_rows; ++r)
+        for (size_t c = 0; c < in_c_; ++c)
         {
-            size_t max_in_row = argmax_indices_[r * batch_size + b];
-            scalar_t grad_val = gradient(r, b);
-            grad_input_(max_in_row, b) += grad_val;
+            for (size_t i = 0; i < out_h_; ++i)
+            {
+                for (size_t j = 0; j < out_w_; ++j)
+                {
+                    size_t out_idx =
+                        ((b * in_c_ + c) * out_h_ + i) * out_w_ + j;
+                    size_t max_in_idx = argmax_indices_[out_idx];
+                    size_t in_r = max_in_idx / in_w_;
+                    size_t in_c = max_in_idx % in_w_;
+
+                    grad_input_(b, c, in_r, in_c) += gradient(b, c, i, j);
+                }
+            }
         }
     }
 
@@ -105,23 +100,39 @@ const Matrix &PoolingLayer::backward(const Matrix &gradient)
 
 void PoolingLayer::save(std::ostream &os) const
 {
-    uint32_t marker = make_marker(LAYER_MARKER);
+    uint32_t marker = make_marker("POOL");
     os.write(reinterpret_cast<const char *>(&marker), sizeof(marker));
-    os.write(reinterpret_cast<const char *>(&pool_size_), sizeof(pool_size_));
-    os.write(reinterpret_cast<const char *>(&stride_), sizeof(stride_));
+
+    uint64_t in_h = in_h_, in_w = in_w_, in_c = in_c_, pool_size = pool_size_,
+             stride = stride_;
+    os.write(reinterpret_cast<const char *>(&in_h), sizeof(in_h));
+    os.write(reinterpret_cast<const char *>(&in_w), sizeof(in_w));
+    os.write(reinterpret_cast<const char *>(&in_c), sizeof(in_c));
+    os.write(reinterpret_cast<const char *>(&pool_size), sizeof(pool_size));
+    os.write(reinterpret_cast<const char *>(&stride), sizeof(stride));
 }
 
 void PoolingLayer::load(std::istream &is)
 {
     uint32_t marker;
-    size_t s, st;
     is.read(reinterpret_cast<char *>(&marker), sizeof(marker));
-    is.read(reinterpret_cast<char *>(&s), sizeof(s));
-    is.read(reinterpret_cast<char *>(&st), sizeof(st));
-    if (marker != make_marker(LAYER_MARKER) || s != pool_size_ || st != stride_)
-    {
-        throw std::runtime_error("Invalid PoolingLayer data in binary load");
-    }
+    if (marker != make_marker("POOL"))
+        throw std::runtime_error("Architecture mismatch in PoolingLayer load");
+
+    uint64_t in_h, in_w, in_c, pool_size, stride;
+    is.read(reinterpret_cast<char *>(&in_h), sizeof(in_h));
+    is.read(reinterpret_cast<char *>(&in_w), sizeof(in_w));
+    is.read(reinterpret_cast<char *>(&in_c), sizeof(in_c));
+    is.read(reinterpret_cast<char *>(&pool_size), sizeof(pool_size));
+    is.read(reinterpret_cast<char *>(&stride), sizeof(stride));
+
+    in_h_ = in_h;
+    in_w_ = in_w;
+    in_c_ = in_c;
+    pool_size_ = pool_size;
+    stride_ = stride;
+    out_h_ = (in_h_ - pool_size_) / stride_ + 1;
+    out_w_ = (in_w_ - pool_size_) / stride_ + 1;
 }
 
 nlohmann::json PoolingLayer::get_config() const
