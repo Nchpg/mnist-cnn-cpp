@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "core/model.hpp"
+#include "data/dataset.hpp"
 #include "data/mnist_dataset.hpp"
 #include "utils/matrix.hpp"
 
@@ -54,8 +55,8 @@ public:
     std::vector<scalar_t> predict(const Matrix &image);
     int predict_label(const Matrix &image);
 
-    void train(MnistDataset &dataset, size_t epochs);
-    scalar_t accuracy(const MnistDataset &dataset);
+    void train(Dataset &dataset, size_t epochs);
+    scalar_t accuracy(const Dataset &dataset);
     void save(const std::string &path) const;
 
     void print_architecture() const;

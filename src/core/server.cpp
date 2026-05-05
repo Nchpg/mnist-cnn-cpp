@@ -3,12 +3,14 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <mutex>
 #include <netinet/in.h>
 #include <optional>
 #include <signal.h>
 #include <sstream>
 #include <string>
 #include <sys/socket.h>
+#include <thread>
 #include <unistd.h>
 #include <vector>
 
@@ -18,8 +20,10 @@
 
 #define HEADER_BUFFER_SIZE 4096
 #define DEFAULT_PORT 8080
+#define THREAD_POOL_SIZE 4
 
 static volatile sig_atomic_t keep_running = 1;
+static std::mutex cnn_mutex;
 
 static void handle_signal(int)
 {
@@ -113,8 +117,14 @@ static void handle_predict(int client_fd, CNN &cnn, const std::string &body)
         return;
     }
 
-    std::vector<scalar_t> probabilities = cnn.predict(image);
-    int prediction = cnn.predict_label(image);
+    std::vector<scalar_t> probabilities;
+    int prediction;
+
+    {
+        std::lock_guard<std::mutex> lock(cnn_mutex);
+        probabilities = cnn.predict(image);
+        prediction = cnn.predict_label(image);
+    }
 
     std::ostringstream response;
     response << "{\"prediction\":" << prediction << ",\"probabilities\":[";
@@ -214,15 +224,49 @@ int main(int argc, char **argv)
     signal(SIGINT, handle_signal);
     int server_fd = create_server_socket(port);
     std::cout << "MNIST server on port " << port << std::endl;
+
+    std::vector<std::thread> client_threads;
+
     while (keep_running)
     {
+        struct timeval tv;
+        tv.tv_sec = 1;
+        tv.tv_usec = 0;
+
+        fd_set read_fds;
+        FD_ZERO(&read_fds);
+        FD_SET(server_fd, &read_fds);
+
+        int select_result = select(server_fd + 1, &read_fds, nullptr, nullptr, &tv);
+        if (select_result <= 0)
+            continue;
+
         int client_fd = accept(server_fd, nullptr, nullptr);
         if (client_fd >= 0)
         {
-            handle_client(client_fd, cnn);
-            close(client_fd);
+            client_threads.emplace_back([client_fd, &cnn]() {
+                handle_client(client_fd, cnn);
+                close(client_fd);
+            });
+
+            if (client_threads.size() > THREAD_POOL_SIZE)
+            {
+                for (auto &t : client_threads)
+                {
+                    if (t.joinable())
+                        t.join();
+                }
+                client_threads.clear();
+            }
         }
     }
+
+    for (auto &t : client_threads)
+    {
+        if (t.joinable())
+            t.join();
+    }
+
     close(server_fd);
     return 0;
 }

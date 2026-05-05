@@ -18,9 +18,9 @@ ConvLayer::ConvLayer(size_t input_rows, size_t input_cols,
     size_t weights_per_filter = input_channels * kernel_size * kernel_size;
     filters_matrix_ = Matrix(filter_count, weights_per_filter);
 
-    scalar_t scale =
+    scalar_t std_dev =
         std::sqrt(2.0f / static_cast<scalar_t>(weights_per_filter));
-    filters_matrix_.random_uniform(scale, gen);
+    filters_matrix_.random_normal(std_dev, gen);
 
     biases_ = Matrix(filter_count, 1);
     biases_grad_ = Matrix(filter_count, 1);

@@ -34,13 +34,20 @@ const Matrix &DropoutLayer::forward(const Matrix &input)
 
 #pragma omp parallel
     {
-        std::mt19937 &local_gen = local_gen_;
+        static thread_local bool initialized = false;
+        if (!initialized)
+        {
+            std::random_device rd;
+            local_gen_.seed(rd() ^ omp_get_thread_num());
+            initialized = true;
+        }
+
         std::uniform_real_distribution<scalar_t> dist(0.0f, 1.0f);
 
 #pragma omp for
         for (size_t i = 0; i < n; ++i)
         {
-            if (dist(local_gen) > ratio_)
+            if (dist(local_gen_) > ratio_)
             {
                 mask_ptr[i] = scale;
             }

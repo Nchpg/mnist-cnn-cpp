@@ -3,9 +3,10 @@
 #include <stdexcept>
 
 #include "data/constants.hpp"
+#include "data/dataset.hpp"
 #include "utils/matrix.hpp"
 
-class MnistDataset
+class MnistDataset : public Dataset
 {
 private:
     size_t count_ = 0;

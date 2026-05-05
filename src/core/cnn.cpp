@@ -187,7 +187,7 @@ int CNN::predict_label(const Matrix &image)
     return static_cast<int>(results[0]);
 }
 
-void CNN::train(MnistDataset &dataset, size_t epochs)
+void CNN::train(Dataset &dataset, size_t epochs)
 {
     model_.set_training(true);
     if (model_.optimizer())
@@ -307,7 +307,7 @@ void CNN::train(MnistDataset &dataset, size_t epochs)
           (hp_.loss_type == LossType::CrossEntropy) ? "CrossEntropy" : "MSE" },
         { "optimizer",
           { { "type",
-              (hp_.optimizer_type == OptimizerType::SGD) ? "SGD" : "Adam" },
+               (hp_.optimizer_type == OptimizerType::SGD) ? "SGD" : "Adam" },
             { "learning_rate", hp_.learning_rate },
             { "beta1", hp_.beta1 },
             { "beta2", hp_.beta2 },
@@ -316,7 +316,7 @@ void CNN::train(MnistDataset &dataset, size_t epochs)
     history_.push_back(session);
 }
 
-scalar_t CNN::accuracy(const MnistDataset &dataset)
+scalar_t CNN::accuracy(const Dataset &dataset)
 {
     model_.set_training(false);
     size_t correct = 0;

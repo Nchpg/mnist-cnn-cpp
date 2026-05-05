@@ -17,8 +17,8 @@ DenseLayer::DenseLayer(size_t input_size, size_t output_size, std::mt19937 &gen)
     , input_t_(1, input_size)
     , grad_input_(input_size, 1)
 {
-    scalar_t scale = std::sqrt(2.0f / static_cast<scalar_t>(input_size));
-    weights_.random_uniform(scale, gen);
+    scalar_t std_dev = std::sqrt(2.0f / static_cast<scalar_t>(input_size));
+    weights_.random_normal(std_dev, gen);
     biases_.fill(0.0f);
     clear_gradients();
 }

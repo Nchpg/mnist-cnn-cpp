@@ -67,6 +67,7 @@ public:
 
     void fill(scalar_t value) noexcept;
     void random_uniform(scalar_t scale, std::mt19937 &gen);
+    void random_normal(scalar_t std_dev, std::mt19937 &gen);
     void reshape(size_t rows, size_t cols);
 
     Matrix &operator+=(const Matrix &other);

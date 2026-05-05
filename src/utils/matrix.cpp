@@ -37,6 +37,14 @@ void Matrix::random_uniform(scalar_t scale, std::mt19937 &gen)
         data_[i] = dist(gen);
 }
 
+void Matrix::random_normal(scalar_t std_dev, std::mt19937 &gen)
+{
+    std::normal_distribution<scalar_t> dist(0.0f, std_dev);
+    size_t n = rows_ * cols_;
+    for (size_t i = 0; i < n; ++i)
+        data_[i] = dist(gen);
+}
+
 void Matrix::reshape(size_t rows, size_t cols)
 {
     size_t new_size = rows * cols;
