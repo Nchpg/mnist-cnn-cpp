@@ -14,6 +14,8 @@
 
 #include "data/mnist_dataset.hpp"
 #include "layers/activation/activation.hpp"
+#include "layers/activation/relu_layer.hpp"
+#include "layers/activation/sigmoid_layer.hpp"
 #include "layers/activation/softmax_layer.hpp"
 #include "layers/batchnorm_layer.hpp"
 #include "layers/conv_layer.hpp"
@@ -21,7 +23,6 @@
 #include "layers/dropout_layer.hpp"
 #include "layers/flatten_layer.hpp"
 #include "layers/pooling_layer.hpp"
-#include "layers/relu_layer.hpp"
 #include "loss/cross_entropy_loss.hpp"
 #include "loss/loss.hpp"
 #include "loss/mse_loss.hpp"
@@ -105,6 +106,12 @@ void CNN::build_from_json(const nlohmann::json &config_data)
         else if (type == "ReLU")
         {
             auto layer = std::make_unique<ReluLayer>();
+            current_shape = layer->get_output_shape(current_shape);
+            model_.add(std::move(layer));
+        }
+        else if (type == "Sigmoid")
+        {
+            auto layer = std::make_unique<SigmoidLayer>();
             current_shape = layer->get_output_shape(current_shape);
             model_.add(std::move(layer));
         }

@@ -28,11 +28,12 @@ COMMON_SRC := src/core/cnn.cpp \
               src/loss/mse_loss.cpp \
               src/layers/activation/activation.cpp \
               src/layers/activation/softmax_layer.cpp \
+              src/layers/activation/relu_layer.cpp \
+              src/layers/activation/sigmoid_layer.cpp \
               src/optimizers/sgd_optimizer.cpp \
               src/optimizers/adam_optimizer.cpp \
               src/layers/flatten_layer.cpp \
-              src/layers/dropout_layer.cpp \
-              src/layers/relu_layer.cpp
+              src/layers/dropout_layer.cpp
 CLI_SRC := src/core/main.cpp $(COMMON_SRC)
 SERVER_SRC := src/core/server.cpp $(COMMON_SRC)
 AUGMENT_SRC := src/data/data_augmentation.cpp

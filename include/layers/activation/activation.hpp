@@ -10,8 +10,17 @@
 
 namespace Activation
 {
-    scalar_t relu(scalar_t x);
-    scalar_t relu_deriv(scalar_t x);
+    // ReLU
+    void relu(const Matrix &in, Matrix &out);
+    void relu_backward(const Matrix &in, const Matrix &grad_out, Matrix &grad_in);
 
-    void softmax(const Matrix &logits, Matrix &probs);
+    // Sigmoid
+    void sigmoid(const Matrix &in, Matrix &out);
+    void sigmoid_backward(const Matrix &out, const Matrix &grad_out,
+                          Matrix &grad_in);
+
+    // Softmax
+    void softmax(const Matrix &in, Matrix &out);
+    void softmax_backward(const Matrix &out, const Matrix &grad_out,
+                          Matrix &grad_in);
 } // namespace Activation
