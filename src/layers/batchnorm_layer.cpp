@@ -12,20 +12,17 @@ BatchNormLayer::BatchNormLayer(size_t channels, size_t spatial_size)
     running_var_.reshape(Shape({ channels, 1 }), 1.0f);
 }
 
-const Tensor &BatchNormLayer::forward(const Tensor &input,
-                                      std::unique_ptr<LayerContext> &ctx,
-                                      bool is_training) const
+const Tensor& BatchNormLayer::forward(const Tensor& input, std::unique_ptr<LayerContext>& ctx, bool is_training) const
 {
     if (!ctx)
     {
         ctx = std::make_unique<BatchNormContext>();
     }
-    auto *bn_ctx = static_cast<BatchNormContext *>(ctx.get());
+    auto* bn_ctx = static_cast<BatchNormContext*>(ctx.get());
 
     size_t batch_size = input.shape()[0];
 
-    if (bn_ctx->normalized.shape().rank() == 0
-        || bn_ctx->normalized.shape()[0] != batch_size)
+    if (bn_ctx->normalized.shape().rank() == 0 || bn_ctx->normalized.shape()[0] != batch_size)
     {
         bn_ctx->x_hat.reshape(input.shape());
         bn_ctx->normalized.reshape(input.shape());
@@ -62,8 +59,7 @@ const Tensor &BatchNormLayer::forward(const Tensor &input,
                 {
                     for (size_t x = 0; x < width; ++x)
                     {
-                        scalar_t diff =
-                            input(b, c, y, x) - bn_ctx->saved_mean(c, 0);
+                        scalar_t diff = input(b, c, y, x) - bn_ctx->saved_mean(c, 0);
                         var_sum += diff * diff;
                     }
                 }
@@ -76,16 +72,12 @@ const Tensor &BatchNormLayer::forward(const Tensor &input,
                 corrected_var = bn_ctx->saved_var(c, 0) * N / (N - 1.0f);
             }
 
-            running_mean_(c, 0) = momentum_ * running_mean_(c, 0)
-                + (1.0f - momentum_) * bn_ctx->saved_mean(c, 0);
-            running_var_(c, 0) = momentum_ * running_var_(c, 0)
-                + (1.0f - momentum_) * corrected_var;
+            running_mean_(c, 0) = momentum_ * running_mean_(c, 0) + (1.0f - momentum_) * bn_ctx->saved_mean(c, 0);
+            running_var_(c, 0) = momentum_ * running_var_(c, 0) + (1.0f - momentum_) * corrected_var;
         }
 
-        scalar_t mean_to_use =
-            is_training ? bn_ctx->saved_mean(c, 0) : running_mean_(c, 0);
-        scalar_t var_to_use =
-            is_training ? bn_ctx->saved_var(c, 0) : running_var_(c, 0);
+        scalar_t mean_to_use = is_training ? bn_ctx->saved_mean(c, 0) : running_mean_(c, 0);
+        scalar_t var_to_use = is_training ? bn_ctx->saved_var(c, 0) : running_var_(c, 0);
         scalar_t std_inv = 1.0f / std::sqrt(var_to_use + epsilon_);
 
         scalar_t gamma_c = gamma_(c, 0);
@@ -97,11 +89,9 @@ const Tensor &BatchNormLayer::forward(const Tensor &input,
             {
                 for (size_t x = 0; x < width; ++x)
                 {
-                    scalar_t val_x_hat =
-                        (input(b, c, y, x) - mean_to_use) * std_inv;
+                    scalar_t val_x_hat = (input(b, c, y, x) - mean_to_use) * std_inv;
                     bn_ctx->x_hat(b, c, y, x) = val_x_hat;
-                    bn_ctx->normalized(b, c, y, x) =
-                        val_x_hat * gamma_c + beta_c;
+                    bn_ctx->normalized(b, c, y, x) = val_x_hat * gamma_c + beta_c;
                 }
             }
         }
@@ -110,22 +100,18 @@ const Tensor &BatchNormLayer::forward(const Tensor &input,
     return bn_ctx->normalized;
 }
 
-const Tensor &BatchNormLayer::backward(const Tensor &gradient,
-                                       std::unique_ptr<LayerContext> &ctx,
-                                       bool is_training)
+const Tensor& BatchNormLayer::backward(const Tensor& gradient, std::unique_ptr<LayerContext>& ctx, bool is_training)
 {
-    assert(is_training
-           && "Backward doit uniquement etre appele durant l'entrainement !");
+    assert(is_training && "Backward doit uniquement etre appele durant l'entrainement !");
     (void)is_training;
-    auto *bn_ctx = static_cast<BatchNormContext *>(ctx.get());
+    auto* bn_ctx = static_cast<BatchNormContext*>(ctx.get());
 
     size_t batch_size = gradient.shape()[0];
     size_t height = gradient.shape()[2];
     size_t width = gradient.shape()[3];
     scalar_t N = static_cast<scalar_t>(spatial_size_ * batch_size);
 
-    if (bn_ctx->grad_input.shape().rank() == 0
-        || bn_ctx->grad_input.shape()[0] != batch_size)
+    if (bn_ctx->grad_input.shape().rank() == 0 || bn_ctx->grad_input.shape()[0] != batch_size)
     {
         bn_ctx->grad_input.reshape(gradient.shape());
     }
@@ -171,8 +157,7 @@ const Tensor &BatchNormLayer::backward(const Tensor &gradient,
                     scalar_t dy = gradient(b, c, y, x);
                     scalar_t val_x_hat = bn_ctx->x_hat(b, c, y, x);
 
-                    scalar_t dx =
-                        coef * (dy - (sum_dy / N) - val_x_hat * (sum_dy_xhat / N));
+                    scalar_t dx = coef * (dy - (sum_dy / N) - val_x_hat * (sum_dy_xhat / N));
                     bn_ctx->grad_input(b, c, y, x) = dx;
                 }
             }
@@ -190,15 +175,14 @@ void BatchNormLayer::clear_gradients()
         grad_beta_.fill(0.0f);
 }
 
-void BatchNormLayer::save(std::ostream &os) const
+void BatchNormLayer::save(std::ostream& os) const
 {
     uint32_t marker = make_marker("BNRM");
-    os.write(reinterpret_cast<const char *>(&marker), sizeof(marker));
+    os.write(reinterpret_cast<const char*>(&marker), sizeof(marker));
 
     uint64_t channels = channels_, spatial_size = spatial_size_;
-    os.write(reinterpret_cast<const char *>(&channels), sizeof(channels));
-    os.write(reinterpret_cast<const char *>(&spatial_size),
-             sizeof(spatial_size));
+    os.write(reinterpret_cast<const char*>(&channels), sizeof(channels));
+    os.write(reinterpret_cast<const char*>(&spatial_size), sizeof(spatial_size));
 
     gamma_.save(os);
     beta_.save(os);
@@ -206,16 +190,16 @@ void BatchNormLayer::save(std::ostream &os) const
     running_var_.save(os);
 }
 
-void BatchNormLayer::load(std::istream &is)
+void BatchNormLayer::load(std::istream& is)
 {
     uint32_t marker;
-    is.read(reinterpret_cast<char *>(&marker), sizeof(marker));
+    is.read(reinterpret_cast<char*>(&marker), sizeof(marker));
     if (marker != make_marker("BNRM"))
         throw std::runtime_error("Arch mismatch in BatchNormLayer load");
 
     uint64_t channels, spatial_size;
-    is.read(reinterpret_cast<char *>(&channels), sizeof(channels));
-    is.read(reinterpret_cast<char *>(&spatial_size), sizeof(spatial_size));
+    is.read(reinterpret_cast<char*>(&channels), sizeof(channels));
+    is.read(reinterpret_cast<char*>(&spatial_size), sizeof(spatial_size));
 
     channels_ = channels;
     spatial_size_ = spatial_size;
@@ -231,7 +215,7 @@ nlohmann::json BatchNormLayer::get_config() const
     return { { "type", "BatchNorm" } };
 }
 
-Shape3D BatchNormLayer::get_output_shape(const Shape3D &input_shape) const
+Shape3D BatchNormLayer::get_output_shape(const Shape3D& input_shape) const
 {
     return input_shape;
 }

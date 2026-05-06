@@ -30,32 +30,28 @@ private:
     Tensor biases_grad_;
 
 public:
-    ConvLayer(size_t input_h, size_t input_w, size_t input_c,
-              size_t kernel_size, size_t filter_count, std::mt19937 &gen);
+    ConvLayer(size_t input_h, size_t input_w, size_t input_c, size_t kernel_size, size_t filter_count,
+              std::mt19937& gen);
     ~ConvLayer() override = default;
 
-    const Tensor &forward(const Tensor &input,
-                          std::unique_ptr<LayerContext> &ctx,
-                          bool is_training) const override;
-    const Tensor &backward(const Tensor &gradient,
-                           std::unique_ptr<LayerContext> &ctx,
-                           bool is_training) override;
+    const Tensor& forward(const Tensor& input, std::unique_ptr<LayerContext>& ctx, bool is_training) const override;
+    const Tensor& backward(const Tensor& gradient, std::unique_ptr<LayerContext>& ctx, bool is_training) override;
 
     void clear_gradients() override;
 
-    void save(std::ostream &os) const override;
-    void load(std::istream &is) override;
+    void save(std::ostream& os) const override;
+    void load(std::istream& is) override;
 
-    std::vector<Tensor *> get_weights() override
+    std::vector<Tensor*> get_weights() override
     {
         return { &filters_, &biases_ };
     }
-    std::vector<Tensor *> get_gradients() override
+    std::vector<Tensor*> get_gradients() override
     {
         return { &filters_grad_, &biases_grad_ };
     }
 
     nlohmann::json get_config() const override;
 
-    Shape3D get_output_shape(const Shape3D &input_shape) const override;
+    Shape3D get_output_shape(const Shape3D& input_shape) const override;
 };

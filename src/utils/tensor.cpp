@@ -66,21 +66,21 @@ void Tensor::fill(scalar_t value)
     std::fill(data_.begin(), data_.end(), value);
 }
 
-void Tensor::random_uniform(scalar_t scale, std::mt19937 &gen)
+void Tensor::random_uniform(scalar_t scale, std::mt19937& gen)
 {
     std::uniform_real_distribution<scalar_t> dist(-scale, scale);
-    for (auto &val : data_)
+    for (auto& val : data_)
         val = dist(gen);
 }
 
-void Tensor::random_normal(scalar_t std_dev, std::mt19937 &gen)
+void Tensor::random_normal(scalar_t std_dev, std::mt19937& gen)
 {
     std::normal_distribution<scalar_t> dist(0.0f, std_dev);
-    for (auto &val : data_)
+    for (auto& val : data_)
         val = dist(gen);
 }
 
-Tensor &Tensor::operator+=(const Tensor &other)
+Tensor& Tensor::operator+=(const Tensor& other)
 {
     if (shape_ != other.shape_)
     {
@@ -93,7 +93,7 @@ Tensor &Tensor::operator+=(const Tensor &other)
     return *this;
 }
 
-Tensor &Tensor::operator-=(const Tensor &other)
+Tensor& Tensor::operator-=(const Tensor& other)
 {
     if (shape_ != other.shape_)
     {
@@ -106,7 +106,7 @@ Tensor &Tensor::operator-=(const Tensor &other)
     return *this;
 }
 
-void Tensor::add_scaled(const Tensor &other, scalar_t scale)
+void Tensor::add_scaled(const Tensor& other, scalar_t scale)
 {
     size_t n = data_.size();
 #pragma omp parallel for if (n > 10000)
@@ -114,8 +114,7 @@ void Tensor::add_scaled(const Tensor &other, scalar_t scale)
         data_[i] += other.data_[i] * scale;
 }
 
-void Tensor::matmul(const Tensor &A, const Tensor &B, Tensor &C, bool transA,
-                    bool transB)
+void Tensor::matmul(const Tensor& A, const Tensor& B, Tensor& C, bool transA, bool transB)
 {
     assert(A.rank() == 2 && "Matmul: A must be 2D");
     assert(B.rank() == 2 && "Matmul: B must be 2D");
@@ -135,9 +134,9 @@ void Tensor::matmul(const Tensor &A, const Tensor &B, Tensor &C, bool transA,
         C.reshape(Shape({ M, N }));
     C.fill(0.0f);
 
-    scalar_t *C_ptr = C.data_ptr();
-    const scalar_t *A_ptr = A.data_ptr();
-    const scalar_t *B_ptr = B.data_ptr();
+    scalar_t* C_ptr = C.data_ptr();
+    const scalar_t* A_ptr = A.data_ptr();
+    const scalar_t* B_ptr = B.data_ptr();
     size_t lda = A.shape()[1];
     size_t ldb = B.shape()[1];
     size_t ldc = C.shape()[1];
@@ -179,51 +178,50 @@ void Tensor::matmul(const Tensor &A, const Tensor &B, Tensor &C, bool transA,
     }
 }
 
-scalar_t &Tensor::operator()(size_t n, size_t c, size_t h, size_t w)
+scalar_t& Tensor::operator()(size_t n, size_t c, size_t h, size_t w)
 {
     assert(rank() == 4);
     assert(n < shape_[0] && c < shape_[1] && h < shape_[2] && w < shape_[3]);
     return data_[n * strides_[0] + c * strides_[1] + h * strides_[2] + w];
 }
 
-const scalar_t &Tensor::operator()(size_t n, size_t c, size_t h, size_t w) const
+const scalar_t& Tensor::operator()(size_t n, size_t c, size_t h, size_t w) const
 {
     assert(rank() == 4);
     assert(n < shape_[0] && c < shape_[1] && h < shape_[2] && w < shape_[3]);
     return data_[n * strides_[0] + c * strides_[1] + h * strides_[2] + w];
 }
 
-scalar_t &Tensor::operator()(size_t i, size_t j)
+scalar_t& Tensor::operator()(size_t i, size_t j)
 {
     assert(rank() == 2);
     assert(i < shape_[0] && j < shape_[1]);
     return data_[i * strides_[0] + j];
 }
 
-const scalar_t &Tensor::operator()(size_t i, size_t j) const
+const scalar_t& Tensor::operator()(size_t i, size_t j) const
 {
     assert(rank() == 2);
     assert(i < shape_[0] && j < shape_[1]);
     return data_[i * strides_[0] + j];
 }
 
-void Tensor::save(std::ostream &os) const
+void Tensor::save(std::ostream& os) const
 {
     uint64_t r = rank();
-    os.write(reinterpret_cast<const char *>(&r), sizeof(r));
+    os.write(reinterpret_cast<const char*>(&r), sizeof(r));
     for (size_t i = 0; i < r; ++i)
     {
         uint64_t dim = shape_[i];
-        os.write(reinterpret_cast<const char *>(&dim), sizeof(dim));
+        os.write(reinterpret_cast<const char*>(&dim), sizeof(dim));
     }
-    os.write(reinterpret_cast<const char *>(data_.data()),
-             data_.size() * sizeof(scalar_t));
+    os.write(reinterpret_cast<const char*>(data_.data()), data_.size() * sizeof(scalar_t));
 }
 
-void Tensor::load(std::istream &is)
+void Tensor::load(std::istream& is)
 {
     uint64_t r;
-    if (!is.read(reinterpret_cast<char *>(&r), sizeof(r)))
+    if (!is.read(reinterpret_cast<char*>(&r), sizeof(r)))
         throw std::runtime_error("Tensor load failed: cannot read rank");
 
     if (r > MAX_DIMS)
@@ -233,13 +231,12 @@ void Tensor::load(std::istream &is)
     for (size_t i = 0; i < r; ++i)
     {
         uint64_t d;
-        if (!is.read(reinterpret_cast<char *>(&d), sizeof(d)))
+        if (!is.read(reinterpret_cast<char*>(&d), sizeof(d)))
             throw std::runtime_error("Tensor load failed: cannot read dimension");
         dims[i] = d;
     }
 
     reshape(Shape(dims));
-    if (!is.read(reinterpret_cast<char *>(data_.data()),
-                 data_.size() * sizeof(scalar_t)))
+    if (!is.read(reinterpret_cast<char*>(data_.data()), data_.size() * sizeof(scalar_t)))
         throw std::runtime_error("Tensor load failed: truncated data");
 }

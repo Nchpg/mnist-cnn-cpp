@@ -13,8 +13,7 @@
 
 #include "data/constants.hpp"
 
-void MnistDataset::compute_normalization(
-    const std::vector<scalar_t> &images_data)
+void MnistDataset::compute_normalization(const std::vector<scalar_t>& images_data)
 {
     if (images_data.empty())
         return;
@@ -53,7 +52,7 @@ void MnistDataset::apply_normalization()
     }
 }
 
-MnistDataset MnistDataset::load(const std::string &path, size_t limit)
+MnistDataset MnistDataset::load(const std::string& path, size_t limit)
 {
     if (path.length() >= 4 && path.substr(path.length() - 4) == ".bin")
     {
@@ -62,7 +61,7 @@ MnistDataset MnistDataset::load(const std::string &path, size_t limit)
     return load_csv(path, limit);
 }
 
-MnistDataset MnistDataset::load_bin(const std::string &path, size_t limit)
+MnistDataset MnistDataset::load_bin(const std::string& path, size_t limit)
 {
     std::ifstream file(path, std::ios::binary);
     if (!file.is_open())
@@ -79,12 +78,11 @@ MnistDataset MnistDataset::load_bin(const std::string &path, size_t limit)
 
     while (limit == 0 || dataset.count_ < limit)
     {
-        if (!file.read(reinterpret_cast<char *>(&label), 1))
+        if (!file.read(reinterpret_cast<char*>(&label), 1))
             break;
-        if (!file.read(reinterpret_cast<char *>(pixels.data()), PIXELS))
+        if (!file.read(reinterpret_cast<char*>(pixels.data()), PIXELS))
         {
-            throw std::runtime_error("Incomplete record in binary file: "
-                                     + path);
+            throw std::runtime_error("Incomplete record in binary file: " + path);
         }
 
         for (size_t i = 0; i < PIXELS; ++i)
@@ -104,7 +102,7 @@ MnistDataset MnistDataset::load_bin(const std::string &path, size_t limit)
     return dataset;
 }
 
-MnistDataset MnistDataset::load_csv(const std::string &path, size_t limit)
+MnistDataset MnistDataset::load_csv(const std::string& path, size_t limit)
 {
     std::ifstream file(path);
     if (!file.is_open())
@@ -120,7 +118,7 @@ MnistDataset MnistDataset::load_csv(const std::string &path, size_t limit)
     if (!std::getline(file, line))
         throw std::runtime_error("File is empty: " + path);
 
-    auto parse_line = [&](const std::string &l) {
+    auto parse_line = [&](const std::string& l) {
         std::stringstream ss(l);
         std::string token;
         if (!std::getline(ss, token, ','))
@@ -131,8 +129,7 @@ MnistDataset MnistDataset::load_csv(const std::string &path, size_t limit)
         {
             if (!std::getline(ss, token, ','))
                 throw std::runtime_error("Invalid CSV row");
-            dataset.all_images_data_.push_back(
-                static_cast<scalar_t>(std::stoi(token)) / NORMALIZE_DIVISOR);
+            dataset.all_images_data_.push_back(static_cast<scalar_t>(std::stoi(token)) / NORMALIZE_DIVISOR);
         }
         dataset.indices_.push_back(dataset.count_);
         dataset.count_++;
@@ -160,13 +157,11 @@ void MnistDataset::shuffle_indices()
     std::shuffle(indices_.begin(), indices_.end(), gen_);
 }
 
-void MnistDataset::get_batch_images(size_t start_idx, size_t batch_size,
-                                    Tensor &out_batch) const
+void MnistDataset::get_batch_images(size_t start_idx, size_t batch_size, Tensor& out_batch) const
 {
     if (start_idx + batch_size > count_)
         batch_size = count_ - start_idx;
-    if (out_batch.rank() != 2 || out_batch.shape()[0] != batch_size
-        || out_batch.shape()[1] != PIXELS)
+    if (out_batch.rank() != 2 || out_batch.shape()[0] != batch_size || out_batch.shape()[1] != PIXELS)
     {
         out_batch.reshape(Shape({ batch_size, PIXELS }));
     }
@@ -182,8 +177,7 @@ void MnistDataset::get_batch_images(size_t start_idx, size_t batch_size,
     }
 }
 
-void MnistDataset::get_batch_labels(size_t start_idx, size_t batch_size,
-                                    std::vector<size_t> &out_labels) const
+void MnistDataset::get_batch_labels(size_t start_idx, size_t batch_size, std::vector<size_t>& out_labels) const
 {
     if (start_idx + batch_size > count_)
         batch_size = count_ - start_idx;

@@ -15,7 +15,7 @@ private:
     std::vector<size_t> indices_;
     std::mt19937 gen_;
 
-    static bool line_looks_like_header(const std::string &line)
+    static bool line_looks_like_header(const std::string& line)
     {
         size_t pos = 0;
         while (pos < line.length() && std::isspace(line[pos]))
@@ -28,10 +28,10 @@ public:
     scalar_t std_ = 1.0f;
     bool normalize_ = false;
 
-    void compute_normalization(const std::vector<scalar_t> &images_data);
+    void compute_normalization(const std::vector<scalar_t>& images_data);
     void apply_normalization();
 
-    const std::vector<scalar_t> &images_data() const
+    const std::vector<scalar_t>& images_data() const
     {
         return all_images_data_;
     }
@@ -52,9 +52,9 @@ public:
 public:
     MnistDataset() = default;
 
-    static MnistDataset load(const std::string &path, size_t limit = 0);
-    static MnistDataset load_csv(const std::string &path, size_t limit = 0);
-    static MnistDataset load_bin(const std::string &path, size_t limit = 0);
+    static MnistDataset load(const std::string& path, size_t limit = 0);
+    static MnistDataset load_csv(const std::string& path, size_t limit = 0);
+    static MnistDataset load_bin(const std::string& path, size_t limit = 0);
 
     size_t count() const
     {
@@ -65,8 +65,7 @@ public:
         if (index >= count_)
             throw std::out_of_range("Image index out of range");
         Tensor img(Shape({ PIXELS, 1 }), 0.0f);
-        std::copy(all_images_data_.begin() + index * PIXELS,
-                  all_images_data_.begin() + (index + 1) * PIXELS,
+        std::copy(all_images_data_.begin() + index * PIXELS, all_images_data_.begin() + (index + 1) * PIXELS,
                   img.data_ptr());
         return img;
     }
@@ -79,8 +78,6 @@ public:
 
     void shuffle_indices();
 
-    void get_batch_images(size_t start_idx, size_t batch_size,
-                          Tensor &out_batch) const;
-    void get_batch_labels(size_t start_idx, size_t batch_size,
-                          std::vector<size_t> &out_labels) const;
+    void get_batch_images(size_t start_idx, size_t batch_size, Tensor& out_batch) const;
+    void get_batch_labels(size_t start_idx, size_t batch_size, std::vector<size_t>& out_labels) const;
 };

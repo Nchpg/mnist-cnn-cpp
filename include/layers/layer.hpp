@@ -17,31 +17,27 @@ class Layer
 public:
     virtual ~Layer() = default;
 
-    virtual const Tensor &forward(const Tensor &input,
-                                  std::unique_ptr<LayerContext> &ctx,
-                                  bool is_training) const = 0;
-    virtual const Tensor &backward(const Tensor &gradient,
-                                   std::unique_ptr<LayerContext> &ctx,
-                                   bool is_training) = 0;
+    virtual const Tensor& forward(const Tensor& input, std::unique_ptr<LayerContext>& ctx, bool is_training) const = 0;
+    virtual const Tensor& backward(const Tensor& gradient, std::unique_ptr<LayerContext>& ctx, bool is_training) = 0;
 
     virtual void clear_gradients()
     {}
 
-    virtual std::vector<Tensor *> get_weights()
+    virtual std::vector<Tensor*> get_weights()
     {
         return {};
     }
-    virtual std::vector<Tensor *> get_gradients()
+    virtual std::vector<Tensor*> get_gradients()
     {
         return {};
     }
 
-    virtual void save(std::ostream & /*os*/) const
+    virtual void save(std::ostream& /*os*/) const
     {}
-    virtual void load(std::istream & /*is*/)
+    virtual void load(std::istream& /*is*/)
     {}
 
     virtual nlohmann::json get_config() const = 0;
 
-    virtual Shape3D get_output_shape(const Shape3D &input_shape) const = 0;
+    virtual Shape3D get_output_shape(const Shape3D& input_shape) const = 0;
 };

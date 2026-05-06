@@ -9,7 +9,7 @@
 #include "data/mnist_dataset.hpp"
 #include "layers/activation/activation.hpp"
 
-static void usage(const char *program)
+static void usage(const char* program)
 {
     std::cerr << "usage:\n"
               << "  " << program << " info [model_in or architecture.json]\n"
@@ -20,13 +20,10 @@ static void usage(const char *program)
               << " resume <mnist.csv> <model_in> <model_out> [limit=... "
                  "epochs=... lr=...]\n"
               << "  " << program << " test <mnist.csv> <model_in> [limit=...]\n"
-              << "  " << program
-              << " predict <model_in> <mnist.csv> [index=...]\n";
+              << "  " << program << " predict <model_in> <mnist.csv> [index=...]\n";
 }
 
-static void parse_hp_overrides(int start_idx, int argc, char **argv,
-                               Hyperparameters &hp, size_t &epochs,
-                               size_t &limit)
+static void parse_hp_overrides(int start_idx, int argc, char** argv, Hyperparameters& hp, size_t& epochs, size_t& limit)
 {
     for (int i = start_idx; i < argc; ++i)
     {
@@ -48,8 +45,7 @@ static void parse_hp_overrides(int start_idx, int argc, char **argv,
         else if (key == "epsilon")
             hp.epsilon = std::stof(value);
         else if (key == "optimizer")
-            hp.optimizer_type =
-                (value == "SGD" ? OptimizerType::SGD : OptimizerType::Adam);
+            hp.optimizer_type = (value == "SGD" ? OptimizerType::SGD : OptimizerType::Adam);
         else if (key == "epochs")
             epochs = std::stoul(value);
         else if (key == "limit")
@@ -57,31 +53,23 @@ static void parse_hp_overrides(int start_idx, int argc, char **argv,
     }
 }
 
-static void print_training_params(const Hyperparameters &hp, size_t epochs,
-                                  size_t limit)
+static void print_training_params(const Hyperparameters& hp, size_t epochs, size_t limit)
 {
     std::cout << "Effective Training Parameters:\n";
-    std::cout << "  Dataset Limit: "
-              << (limit == 0 ? "All" : std::to_string(limit)) << "\n";
+    std::cout << "  Dataset Limit: " << (limit == 0 ? "All" : std::to_string(limit)) << "\n";
     std::cout << "  Epochs: " << epochs << "\n";
     std::cout << "  Batch Size: " << hp.batch_size << "\n";
-    std::cout << "  Optimizer: "
-              << (hp.optimizer_type == OptimizerType::SGD ? "SGD" : "Adam")
-              << "\n";
+    std::cout << "  Optimizer: " << (hp.optimizer_type == OptimizerType::SGD ? "SGD" : "Adam") << "\n";
     std::cout << "  Learning Rate: " << hp.learning_rate << "\n";
-    std::cout << "  Loss: "
-              << (hp.loss_type == LossType::CrossEntropy ? "CrossEntropy"
-                                                         : "MSE")
-              << "\n";
+    std::cout << "  Loss: " << (hp.loss_type == LossType::CrossEntropy ? "CrossEntropy" : "MSE") << "\n";
     if (hp.optimizer_type == OptimizerType::Adam)
     {
-        std::cout << "  Adam Params: beta1=" << hp.beta1
-                  << ", beta2=" << hp.beta2 << ", eps=" << hp.epsilon << "\n";
+        std::cout << "  Adam Params: beta1=" << hp.beta1 << ", beta2=" << hp.beta2 << ", eps=" << hp.epsilon << "\n";
     }
     std::cout << "-------------------------------------------" << std::endl;
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     if (argc < 2)
     {
@@ -97,8 +85,7 @@ int main(int argc, char **argv)
         CNN cnn;
         try
         {
-            if (path.find('.') != std::string::npos
-                && path.substr(path.find_last_of(".") + 1) == "json")
+            if (path.find('.') != std::string::npos && path.substr(path.find_last_of(".") + 1) == "json")
             {
                 cnn.load_from_json(path);
             }
@@ -108,7 +95,7 @@ int main(int argc, char **argv)
             }
             cnn.print_architecture();
         }
-        catch (const std::exception &e)
+        catch (const std::exception& e)
         {
             std::cerr << "Error: " << e.what() << std::endl;
             return EXIT_FAILURE;
@@ -142,8 +129,7 @@ int main(int argc, char **argv)
 
         cnn.set_normalization(train.mean(), train.std(), train.normalize());
 
-        std::cout << "Starting training from architecture: " << arch_json
-                  << " using " << csv_path << std::endl;
+        std::cout << "Starting training from architecture: " << arch_json << " using " << csv_path << std::endl;
         print_training_params(cnn.hyperparameters(), epochs, limit);
         cnn.train(train, epochs);
         cnn.save(model_out);
@@ -175,8 +161,7 @@ int main(int argc, char **argv)
         train.normalize_ = cnn.normalize();
         train.apply_normalization();
 
-        std::cout << "Resuming training from model: " << model_in << " using "
-                  << csv_path << std::endl;
+        std::cout << "Resuming training from model: " << model_in << " using " << csv_path << std::endl;
         print_training_params(cnn.hyperparameters(), epochs, limit);
         cnn.train(train, epochs);
         cnn.save(model_out);
@@ -208,8 +193,7 @@ int main(int argc, char **argv)
         test.normalize_ = cnn.normalize();
         test.apply_normalization();
 
-        std::cout << "accuracy " << 100.0f * cnn.accuracy(test) << "% on "
-                  << test.count() << " images\n";
+        std::cout << "accuracy " << 100.0f * cnn.accuracy(test) << "% on " << test.count() << " images\n";
     }
     else if (command == "predict")
     {

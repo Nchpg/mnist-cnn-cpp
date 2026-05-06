@@ -13,11 +13,9 @@ private:
     std::vector<Tensor> v_;
 
 public:
-    AdamOptimizer(scalar_t learning_rate, scalar_t beta1 = 0.9f,
-                  scalar_t beta2 = 0.999f, scalar_t epsilon = 1e-8f);
+    AdamOptimizer(scalar_t learning_rate, scalar_t beta1 = 0.9f, scalar_t beta2 = 0.999f, scalar_t epsilon = 1e-8f);
 
-    void set_parameters(const std::vector<Tensor *> &weights,
-                        const std::vector<Tensor *> &grads) override;
+    void set_parameters(const std::vector<Tensor*>& weights, const std::vector<Tensor*>& grads) override;
 
     void step() override;
 

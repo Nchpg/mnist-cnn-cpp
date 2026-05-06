@@ -9,7 +9,7 @@
 
 using scalar_t = float;
 
-inline uint32_t make_marker(const char *s)
+inline uint32_t make_marker(const char* s)
 {
     uint32_t v;
     std::memcpy(&v, s, 4);
@@ -52,7 +52,7 @@ public:
         for (size_t d : dims)
             dims_[i++] = d;
     }
-    Shape(const std::vector<size_t> &dims)
+    Shape(const std::vector<size_t>& dims)
     {
         if (dims.size() > MAX_DIMS)
             throw std::invalid_argument("Shape rank exceeds MAX_DIMS");
@@ -62,7 +62,7 @@ public:
             dims_[i] = dims[i];
     }
 
-    bool operator==(const Shape &other) const
+    bool operator==(const Shape& other) const
     {
         if (rank_ != other.rank_)
             return false;
@@ -71,7 +71,7 @@ public:
                 return false;
         return true;
     }
-    bool operator!=(const Shape &other) const
+    bool operator!=(const Shape& other) const
     {
         return !(*this == other);
     }
@@ -94,12 +94,12 @@ public:
     {
         return dims_.at(i);
     }
-    size_t &operator[](size_t i)
+    size_t& operator[](size_t i)
     {
         return dims_.at(i);
     }
 
-    const std::array<size_t, MAX_DIMS> &dims() const
+    const std::array<size_t, MAX_DIMS>& dims() const
     {
         return dims_;
     }

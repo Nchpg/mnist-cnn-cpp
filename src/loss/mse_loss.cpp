@@ -2,8 +2,7 @@
 
 #include <stdexcept>
 
-scalar_t MSELoss::forward(const Tensor &predictions,
-                          const std::vector<size_t> &targets)
+scalar_t MSELoss::forward(const Tensor& predictions, const std::vector<size_t>& targets)
 {
     size_t batch_size = predictions.shape()[0];
     size_t num_classes = predictions.shape()[1];
@@ -31,16 +30,14 @@ scalar_t MSELoss::forward(const Tensor &predictions,
     return total_loss / static_cast<scalar_t>(num_classes * batch_size);
 }
 
-void MSELoss::backward(const Tensor &predictions,
-                       const std::vector<size_t> &targets, Tensor &grad_output)
+void MSELoss::backward(const Tensor& predictions, const std::vector<size_t>& targets, Tensor& grad_output)
 {
     size_t batch_size = predictions.shape()[0];
     size_t num_classes = predictions.shape()[1];
     if (targets.size() != batch_size)
         throw std::invalid_argument("Targets size must match batch size");
 
-    if (grad_output.rank() != 2 || grad_output.shape()[0] != batch_size
-        || grad_output.shape()[1] != num_classes)
+    if (grad_output.rank() != 2 || grad_output.shape()[0] != batch_size || grad_output.shape()[1] != num_classes)
     {
         grad_output.reshape(Shape({ batch_size, num_classes }));
     }

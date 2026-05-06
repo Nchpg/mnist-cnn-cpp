@@ -5,7 +5,7 @@
 class SGDOptimizer : public Optimizer
 {
 public:
-    SGDOptimizer(scalar_t learning_rate);
+    explicit SGDOptimizer(scalar_t learning_rate);
 
     void step() override;
 };

@@ -11,7 +11,7 @@
 using namespace std;
 using namespace cv;
 
-bool parseCSVLine(const string &line, uint8_t &label, Mat &image)
+bool parseCSVLine(const string& line, uint8_t& label, Mat& image)
 {
     stringstream ss(line);
     string val;
@@ -26,15 +26,14 @@ bool parseCSVLine(const string &line, uint8_t &label, Mat &image)
     {
         if (i < static_cast<int>(PIXELS))
         {
-            image.at<uint8_t>(i / IMG_WIDTH, i % IMG_WIDTH) =
-                static_cast<uint8_t>(stoi(val));
+            image.at<uint8_t>(i / IMG_WIDTH, i % IMG_WIDTH) = static_cast<uint8_t>(stoi(val));
             i++;
         }
     }
     return i == static_cast<int>(PIXELS);
 }
 
-Mat augmentImage(const Mat &input, mt19937 &gen)
+Mat augmentImage(const Mat& input, mt19937& gen)
 {
     Mat output;
 
@@ -54,35 +53,32 @@ Mat augmentImage(const Mat &input, mt19937 &gen)
     rot.at<double>(0, 2) += tx;
     rot.at<double>(1, 2) += ty;
 
-    warpAffine(input, output, rot, input.size(), INTER_LINEAR, BORDER_CONSTANT,
-               Scalar(0));
+    warpAffine(input, output, rot, input.size(), INTER_LINEAR, BORDER_CONSTANT, Scalar(0));
 
     return output;
 }
 
-void writeBinaryRecord(ofstream &outFile, uint8_t label, const Mat &image)
+void writeBinaryRecord(ofstream& outFile, uint8_t label, const Mat& image)
 {
-    outFile.write(reinterpret_cast<const char *>(&label), sizeof(label));
+    outFile.write(reinterpret_cast<const char*>(&label), sizeof(label));
 
     if (image.isContinuous())
     {
-        outFile.write(reinterpret_cast<const char *>(image.data), 784);
+        outFile.write(reinterpret_cast<const char*>(image.data), 784);
     }
     else
     {
         Mat continuousImg = image.clone();
-        outFile.write(reinterpret_cast<const char *>(continuousImg.data), 784);
+        outFile.write(reinterpret_cast<const char*>(continuousImg.data), 784);
     }
 }
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
     if (argc != 4)
     {
-        cerr << "Usage: " << argv[0]
-             << " <source.csv> <destination.bin> <nb_copies>" << endl;
-        cerr << "Example: " << argv[0]
-             << " emnist-mnist-train.csv emnist_augmented.bin 9" << endl;
+        cerr << "Usage: " << argv[0] << " <source.csv> <destination.bin> <nb_copies>" << endl;
+        cerr << "Example: " << argv[0] << " emnist-mnist-train.csv emnist_augmented.bin 9" << endl;
         return -1;
     }
 
@@ -96,8 +92,7 @@ int main(int argc, char **argv)
     }
     catch (...)
     {
-        cerr << "Erreur: Le nombre de copies doit être un entier valide."
-             << endl;
+        cerr << "Erreur: Le nombre de copies doit être un entier valide." << endl;
         return -1;
     }
 
@@ -106,14 +101,12 @@ int main(int argc, char **argv)
 
     if (!inFile.is_open())
     {
-        cerr << "Erreur: Impossible d'ouvrir le fichier source (" << inputFile
-             << ")" << endl;
+        cerr << "Erreur: Impossible d'ouvrir le fichier source (" << inputFile << ")" << endl;
         return -1;
     }
     if (!outFile.is_open())
     {
-        cerr << "Erreur: Impossible de créer le fichier de destination ("
-             << outputFile << ")" << endl;
+        cerr << "Erreur: Impossible de créer le fichier de destination (" << outputFile << ")" << endl;
         return -1;
     }
 
@@ -157,17 +150,14 @@ int main(int argc, char **argv)
             count++;
             if (count % 1000 == 0)
             {
-                cout << count << " images originales traitées ("
-                     << count * (augmentationsPerImage + 1)
+                cout << count << " images originales traitées (" << count * (augmentationsPerImage + 1)
                      << " images générées)..." << flush << "\r";
             }
         }
     }
 
-    cout << "\nTerminé ! " << count << " images originales traitées au total."
-         << endl;
-    cout << "Fichier généré : " << outputFile << " ("
-         << count * (augmentationsPerImage + 1) << " images)" << endl;
+    cout << "\nTerminé ! " << count << " images originales traitées au total." << endl;
+    cout << "Fichier généré : " << outputFile << " (" << count * (augmentationsPerImage + 1) << " images)" << endl;
 
     inFile.close();
     outFile.close();

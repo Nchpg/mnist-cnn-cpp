@@ -38,7 +38,7 @@ class CNN
 private:
     Model model_;
     std::mt19937 gen_;
-    static constexpr const char *MAGIC = "mnist-cnn";
+    static constexpr const char* MAGIC = "mnist-cnn";
     Hyperparameters hp_;
     Shape3D input_shape_;
     std::vector<nlohmann::json> history_;
@@ -47,28 +47,28 @@ private:
     scalar_t data_std_ = 1.0f;
     bool normalize_input_ = false;
 
-    void build_from_json(const nlohmann::json &config_data);
+    void build_from_json(const nlohmann::json& config_data);
 
 public:
     CNN(unsigned int seed = 42);
     ~CNN() = default;
 
-    void load_from_json(const std::string &config_path);
-    void load_from_model(const std::string &path);
+    void load_from_json(const std::string& config_path);
+    void load_from_model(const std::string& path);
 
-    std::vector<scalar_t> predict(const Tensor &image) const;
-    int predict_label(const Tensor &image) const;
+    std::vector<scalar_t> predict(const Tensor& image) const;
+    int predict_label(const Tensor& image) const;
 
-    void train(Dataset &dataset, size_t epochs);
-    scalar_t accuracy(const Dataset &dataset);
-    void save(const std::string &path) const;
+    void train(Dataset& dataset, size_t epochs);
+    scalar_t accuracy(const Dataset& dataset);
+    void save(const std::string& path) const;
 
     void print_architecture() const;
-    const Hyperparameters &hyperparameters() const
+    const Hyperparameters& hyperparameters() const
     {
         return hp_;
     }
-    void set_hyperparameters(const Hyperparameters &hp);
+    void set_hyperparameters(const Hyperparameters& hp);
 
     scalar_t mean() const
     {

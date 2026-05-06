@@ -3,8 +3,7 @@
 #include <cmath>
 #include <stdexcept>
 
-scalar_t CrossEntropyLoss::forward(const Tensor &predictions,
-                                   const std::vector<size_t> &targets)
+scalar_t CrossEntropyLoss::forward(const Tensor& predictions, const std::vector<size_t>& targets)
 {
     size_t batch_size = predictions.shape()[0];
     if (targets.size() != batch_size)
@@ -20,15 +19,12 @@ scalar_t CrossEntropyLoss::forward(const Tensor &predictions,
         {
             scalar_t val = predictions(b, c);
             if (val < 0.0f)
-                throw std::runtime_error(
-                    "Predictions must be positive (require Softmax output)");
+                throw std::runtime_error("Predictions must be positive (require Softmax output)");
             row_sum += val;
         }
         if (std::abs(row_sum - 1.0f) > sum_tol)
         {
-            throw std::runtime_error(
-                "Predictions must sum to 1 (require Softmax). Got sum "
-                + std::to_string(row_sum));
+            throw std::runtime_error("Predictions must sum to 1 (require Softmax). Got sum " + std::to_string(row_sum));
         }
     }
 #endif
@@ -42,15 +38,12 @@ scalar_t CrossEntropyLoss::forward(const Tensor &predictions,
     return total_loss / static_cast<scalar_t>(batch_size);
 }
 
-void CrossEntropyLoss::backward(const Tensor &predictions,
-                                const std::vector<size_t> &targets,
-                                Tensor &grad_output)
+void CrossEntropyLoss::backward(const Tensor& predictions, const std::vector<size_t>& targets, Tensor& grad_output)
 {
     size_t batch_size = predictions.shape()[0];
     size_t num_classes = predictions.shape()[1];
 
-    if (grad_output.rank() != 2 || grad_output.shape()[0] != batch_size
-        || grad_output.shape()[1] != num_classes)
+    if (grad_output.rank() != 2 || grad_output.shape()[0] != batch_size || grad_output.shape()[1] != num_classes)
     {
         grad_output.reshape(Shape({ batch_size, num_classes }));
     }
@@ -65,8 +58,7 @@ void CrossEntropyLoss::backward(const Tensor &predictions,
             scalar_t target = (c == targets[b] ? 1.0f : 0.0f);
             if (target > 0.0f)
             {
-                grad_output(b, c) =
-                    -inv_batch_size / std::max(predictions(b, c), 1e-7f);
+                grad_output(b, c) = -inv_batch_size / std::max(predictions(b, c), 1e-7f);
             }
             else
             {
@@ -76,25 +68,21 @@ void CrossEntropyLoss::backward(const Tensor &predictions,
     }
 }
 
-bool CrossEntropyLoss::supports_fusion_with(const std::string &layer_type) const
+bool CrossEntropyLoss::supports_fusion_with(const std::string& layer_type) const
 {
     return layer_type == "Softmax";
 }
 
-void CrossEntropyLoss::backward_fused(const std::string &layer_type,
-                                      const Tensor &probs,
-                                      const std::vector<size_t> &targets,
-                                      Tensor &grad_logits)
+void CrossEntropyLoss::backward_fused(const std::string& layer_type, const Tensor& probs,
+                                      const std::vector<size_t>& targets, Tensor& grad_logits)
 {
     if (layer_type != "Softmax")
-        throw std::invalid_argument("CrossEntropyLoss cannot fuse with "
-                                    + layer_type);
+        throw std::invalid_argument("CrossEntropyLoss cannot fuse with " + layer_type);
 
     size_t batch_size = probs.shape()[0];
     size_t num_classes = probs.shape()[1];
 
-    if (grad_logits.rank() != 2 || grad_logits.shape()[0] != batch_size
-        || grad_logits.shape()[1] != num_classes)
+    if (grad_logits.rank() != 2 || grad_logits.shape()[0] != batch_size || grad_logits.shape()[1] != num_classes)
     {
         grad_logits.reshape(Shape({ batch_size, num_classes }));
     }

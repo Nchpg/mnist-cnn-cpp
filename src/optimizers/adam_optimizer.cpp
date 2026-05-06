@@ -1,7 +1,6 @@
 #include "optimizers/adam_optimizer.hpp"
 
-AdamOptimizer::AdamOptimizer(scalar_t learning_rate, scalar_t beta1,
-                             scalar_t beta2, scalar_t epsilon)
+AdamOptimizer::AdamOptimizer(scalar_t learning_rate, scalar_t beta1, scalar_t beta2, scalar_t epsilon)
     : Optimizer(learning_rate)
     , beta1_(beta1)
     , beta2_(beta2)
@@ -9,13 +8,12 @@ AdamOptimizer::AdamOptimizer(scalar_t learning_rate, scalar_t beta1,
     , t_(0)
 {}
 
-void AdamOptimizer::set_parameters(const std::vector<Tensor *> &weights,
-                                   const std::vector<Tensor *> &grads)
+void AdamOptimizer::set_parameters(const std::vector<Tensor*>& weights, const std::vector<Tensor*>& grads)
 {
     Optimizer::set_parameters(weights, grads);
     m_.clear();
     v_.clear();
-    for (auto *w : weights)
+    for (auto* w : weights)
     {
         if (w)
         {
@@ -46,17 +44,16 @@ void AdamOptimizer::step()
             continue;
 
         size_t total = weights_[i]->size();
-        scalar_t *w_ptr = weights_[i]->data().data();
-        scalar_t *wg_ptr = gradients_[i]->data().data();
-        scalar_t *mw_ptr = m_[i].data().data();
-        scalar_t *vw_ptr = v_[i].data().data();
+        scalar_t* w_ptr = weights_[i]->data().data();
+        scalar_t* wg_ptr = gradients_[i]->data().data();
+        scalar_t* mw_ptr = m_[i].data().data();
+        scalar_t* vw_ptr = v_[i].data().data();
 
 #pragma omp parallel for if (total > 1000)
         for (size_t j = 0; j < total; ++j)
         {
             mw_ptr[j] = beta1_ * mw_ptr[j] + (1.0f - beta1_) * wg_ptr[j];
-            vw_ptr[j] =
-                beta2_ * vw_ptr[j] + (1.0f - beta2_) * wg_ptr[j] * wg_ptr[j];
+            vw_ptr[j] = beta2_ * vw_ptr[j] + (1.0f - beta2_) * wg_ptr[j] * wg_ptr[j];
             scalar_t m_hat = mw_ptr[j] * m_corr;
             scalar_t v_hat = std::max(0.0f, vw_ptr[j] * v_corr);
             w_ptr[j] -= learning_rate() * m_hat / (std::sqrt(v_hat) + epsilon_);
@@ -67,8 +64,8 @@ void AdamOptimizer::step()
 void AdamOptimizer::reset()
 {
     t_ = 0;
-    for (auto &m_mat : m_)
+    for (auto& m_mat : m_)
         m_mat.fill(0.0f);
-    for (auto &v_mat : v_)
+    for (auto& v_mat : v_)
         v_mat.fill(0.0f);
 }

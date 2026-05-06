@@ -38,7 +38,7 @@ CNN::CNN(unsigned int seed)
     , gen_(seed)
 {}
 
-void CNN::load_from_json(const std::string &config_path)
+void CNN::load_from_json(const std::string& config_path)
 {
     std::ifstream f(config_path);
     if (!f.is_open())
@@ -47,15 +47,14 @@ void CNN::load_from_json(const std::string &config_path)
     build_from_json(config_data);
 }
 
-void CNN::build_from_json(const nlohmann::json &config_data)
+void CNN::build_from_json(const nlohmann::json& config_data)
 {
-    input_shape_ = { config_data["input_shape"]["channels"],
-                     config_data["input_shape"]["height"],
+    input_shape_ = { config_data["input_shape"]["channels"], config_data["input_shape"]["height"],
                      config_data["input_shape"]["width"] };
 
     if (config_data.contains("hyperparameters"))
     {
-        const auto &hp = config_data["hyperparameters"];
+        const auto& hp = config_data["hyperparameters"];
         hp_.batch_size = hp.value("batch_size", 64);
 
         std::string loss_str = hp.value("loss", "CrossEntropy");
@@ -70,10 +69,9 @@ void CNN::build_from_json(const nlohmann::json &config_data)
 
         if (hp.contains("optimizer"))
         {
-            const auto &opt = hp["optimizer"];
+            const auto& opt = hp["optimizer"];
             std::string opt_type = opt.value("type", "Adam");
-            hp_.optimizer_type =
-                (opt_type == "SGD") ? OptimizerType::SGD : OptimizerType::Adam;
+            hp_.optimizer_type = (opt_type == "SGD") ? OptimizerType::SGD : OptimizerType::Adam;
             hp_.learning_rate = opt.value("learning_rate", 0.001f);
             hp_.beta1 = opt.value("beta1", 0.9f);
             hp_.beta2 = opt.value("beta2", 0.999f);
@@ -89,7 +87,7 @@ void CNN::build_from_json(const nlohmann::json &config_data)
     Shape3D current_shape = input_shape_;
     model_.layers().clear();
 
-    for (const auto &layer_def : config_data["layers"])
+    for (const auto& layer_def : config_data["layers"])
     {
         std::string type = layer_def["type"];
 
@@ -97,9 +95,8 @@ void CNN::build_from_json(const nlohmann::json &config_data)
         {
             size_t filters = layer_def["filters"];
             size_t kernel_size = layer_def["kernel_size"];
-            auto layer = std::make_unique<ConvLayer>(
-                current_shape.height, current_shape.width,
-                current_shape.channels, kernel_size, filters, gen_);
+            auto layer = std::make_unique<ConvLayer>(current_shape.height, current_shape.width, current_shape.channels,
+                                                     kernel_size, filters, gen_);
             current_shape = layer->get_output_shape(current_shape);
             model_.add(std::move(layer));
         }
@@ -119,25 +116,22 @@ void CNN::build_from_json(const nlohmann::json &config_data)
         {
             size_t pool_size = layer_def["pool_size"];
             size_t stride = layer_def["stride"];
-            auto layer = std::make_unique<PoolingLayer>(
-                current_shape.height, current_shape.width,
-                current_shape.channels, pool_size, stride);
+            auto layer = std::make_unique<PoolingLayer>(current_shape.height, current_shape.width,
+                                                        current_shape.channels, pool_size, stride);
             current_shape = layer->get_output_shape(current_shape);
             model_.add(std::move(layer));
         }
         else if (type == "Flatten")
         {
-            auto layer = std::make_unique<FlattenLayer>(current_shape.channels,
-                                                        current_shape.height,
-                                                        current_shape.width);
+            auto layer =
+                std::make_unique<FlattenLayer>(current_shape.channels, current_shape.height, current_shape.width);
             current_shape = layer->get_output_shape(current_shape);
             model_.add(std::move(layer));
         }
         else if (type == "Dense")
         {
             size_t units = layer_def["units"];
-            auto layer =
-                std::make_unique<DenseLayer>(current_shape.size(), units, gen_);
+            auto layer = std::make_unique<DenseLayer>(current_shape.size(), units, gen_);
             current_shape = layer->get_output_shape(current_shape);
             model_.add(std::move(layer));
         }
@@ -150,9 +144,8 @@ void CNN::build_from_json(const nlohmann::json &config_data)
         }
         else if (type == "BatchNorm")
         {
-            auto layer = std::make_unique<BatchNormLayer>(
-                current_shape.channels,
-                current_shape.height * current_shape.width);
+            auto layer =
+                std::make_unique<BatchNormLayer>(current_shape.channels, current_shape.height * current_shape.width);
             current_shape = layer->get_output_shape(current_shape);
             model_.add(std::move(layer));
         }
@@ -165,14 +158,13 @@ void CNN::build_from_json(const nlohmann::json &config_data)
     }
 }
 
-std::vector<scalar_t> CNN::predict(const Tensor &image) const
+std::vector<scalar_t> CNN::predict(const Tensor& image) const
 {
     Tensor img_batch = image;
-    img_batch.reshape(Shape(
-        { 1, input_shape_.channels, input_shape_.height, input_shape_.width }));
+    img_batch.reshape(Shape({ 1, input_shape_.channels, input_shape_.height, input_shape_.width }));
 
     std::vector<std::unique_ptr<LayerContext>> contexts;
-    const Tensor &probs = model_.forward(img_batch, contexts, false);
+    const Tensor& probs = model_.forward(img_batch, contexts, false);
 
     std::vector<scalar_t> result(probs.shape()[1]);
     for (size_t i = 0; i < probs.shape()[1]; i++)
@@ -180,19 +172,18 @@ std::vector<scalar_t> CNN::predict(const Tensor &image) const
     return result;
 }
 
-int CNN::predict_label(const Tensor &image) const
+int CNN::predict_label(const Tensor& image) const
 {
     Tensor img_batch = image;
-    img_batch.reshape(Shape(
-        { 1, input_shape_.channels, input_shape_.height, input_shape_.width }));
+    img_batch.reshape(Shape({ 1, input_shape_.channels, input_shape_.height, input_shape_.width }));
 
     std::vector<std::unique_ptr<LayerContext>> contexts;
-    const Tensor &probs = model_.forward(img_batch, contexts, false);
+    const Tensor& probs = model_.forward(img_batch, contexts, false);
     auto results = Utils::argmax(probs);
     return static_cast<int>(results[0]);
 }
 
-void CNN::train(Dataset &dataset, size_t epochs)
+void CNN::train(Dataset& dataset, size_t epochs)
 {
     if (!model_.optimizer())
     {
@@ -233,8 +224,7 @@ void CNN::train(Dataset &dataset, size_t epochs)
     std::string last_layer_type = "";
     if (!model_.layers().empty())
     {
-        last_layer_type =
-            model_.layers().back()->get_config().value("type", "");
+        last_layer_type = model_.layers().back()->get_config().value("type", "");
         use_fused_optimization = loss_fn->supports_fusion_with(last_layer_type);
     }
 
@@ -248,20 +238,16 @@ void CNN::train(Dataset &dataset, size_t epochs)
         size_t correct = 0;
         scalar_t total_loss = 0.0f;
 
-        for (size_t sample = 0; sample < samples_to_process;
-             sample += batch_size)
+        for (size_t sample = 0; sample < samples_to_process; sample += batch_size)
         {
             dataset.get_batch_images(sample, batch_size, batch_images);
             dataset.get_batch_labels(sample, batch_size, batch_labels);
 
-            batch_images.reshape(
-                Shape({ batch_size, input_shape_.channels, input_shape_.height,
-                        input_shape_.width }));
+            batch_images.reshape(Shape({ batch_size, input_shape_.channels, input_shape_.height, input_shape_.width }));
 
-            const Tensor &output = model_.forward(batch_images, contexts, true);
+            const Tensor& output = model_.forward(batch_images, contexts, true);
 
-            total_loss += loss_fn->forward(output, batch_labels)
-                * static_cast<scalar_t>(batch_size);
+            total_loss += loss_fn->forward(output, batch_labels) * static_cast<scalar_t>(batch_size);
 
             auto predictions = Utils::argmax(output);
             for (size_t b = 0; b < batch_size; ++b)
@@ -272,8 +258,7 @@ void CNN::train(Dataset &dataset, size_t epochs)
 
             if (use_fused_optimization)
             {
-                loss_fn->backward_fused(last_layer_type, output, batch_labels,
-                                        grad_output);
+                loss_fn->backward_fused(last_layer_type, output, batch_labels, grad_output);
                 model_.backward_skip_last(grad_output, contexts, true);
             }
             else
@@ -285,11 +270,9 @@ void CNN::train(Dataset &dataset, size_t epochs)
             model_.step();
             model_.clear_gradients();
 
-            scalar_t progress = static_cast<scalar_t>(sample + batch_size)
-                / static_cast<scalar_t>(samples_to_process);
+            scalar_t progress = static_cast<scalar_t>(sample + batch_size) / static_cast<scalar_t>(samples_to_process);
             std::cout << "\rEpoch " << epoch + 1 << "/" << epochs << " [";
-            int pos =
-                static_cast<int>(static_cast<scalar_t>(bar_width) * progress);
+            int pos = static_cast<int>(static_cast<scalar_t>(bar_width) * progress);
             for (int i = 0; i < bar_width; ++i)
             {
                 if (i < pos)
@@ -299,16 +282,13 @@ void CNN::train(Dataset &dataset, size_t epochs)
                 else
                     std::cout << " ";
             }
-            std::cout << "] " << static_cast<int>(progress * 100.0f) << "% "
-                      << (sample + batch_size) << "/" << samples_to_process
-                      << " " << std::flush;
+            std::cout << "] " << static_cast<int>(progress * 100.0f) << "% " << (sample + batch_size) << "/"
+                      << samples_to_process << " " << std::flush;
         }
 
         final_loss = total_loss / static_cast<scalar_t>(samples_to_process);
-        final_acc = 100.0f * static_cast<scalar_t>(correct)
-            / static_cast<scalar_t>(samples_to_process);
-        std::cout << "\n  -> loss: " << final_loss
-                  << " - accuracy: " << final_acc << "%" << std::endl;
+        final_acc = 100.0f * static_cast<scalar_t>(correct) / static_cast<scalar_t>(samples_to_process);
+        std::cout << "\n  -> loss: " << final_loss << " - accuracy: " << final_acc << "%" << std::endl;
     }
 
     json session;
@@ -316,22 +296,18 @@ void CNN::train(Dataset &dataset, size_t epochs)
     session["epochs"] = epochs;
     session["final_loss"] = final_loss;
     session["final_accuracy"] = final_acc;
-    session["hyperparameters"] = {
-        { "batch_size", hp_.batch_size },
-        { "loss",
-          (hp_.loss_type == LossType::CrossEntropy) ? "CrossEntropy" : "MSE" },
-        { "optimizer",
-          { { "type",
-              (hp_.optimizer_type == OptimizerType::SGD) ? "SGD" : "Adam" },
-            { "learning_rate", hp_.learning_rate },
-            { "beta1", hp_.beta1 },
-            { "beta2", hp_.beta2 },
-            { "epsilon", hp_.epsilon } } }
-    };
+    session["hyperparameters"] = { { "batch_size", hp_.batch_size },
+                                   { "loss", (hp_.loss_type == LossType::CrossEntropy) ? "CrossEntropy" : "MSE" },
+                                   { "optimizer",
+                                     { { "type", (hp_.optimizer_type == OptimizerType::SGD) ? "SGD" : "Adam" },
+                                       { "learning_rate", hp_.learning_rate },
+                                       { "beta1", hp_.beta1 },
+                                       { "beta2", hp_.beta2 },
+                                       { "epsilon", hp_.epsilon } } } };
     history_.push_back(session);
 }
 
-scalar_t CNN::accuracy(const Dataset &dataset)
+scalar_t CNN::accuracy(const Dataset& dataset)
 {
     size_t correct = 0;
     const size_t eval_batch_size = 64;
@@ -342,16 +318,14 @@ scalar_t CNN::accuracy(const Dataset &dataset)
 
     for (size_t i = 0; i < dataset.count(); i += eval_batch_size)
     {
-        size_t actual_batch_size =
-            std::min(eval_batch_size, dataset.count() - i);
+        size_t actual_batch_size = std::min(eval_batch_size, dataset.count() - i);
         dataset.get_batch_images(i, actual_batch_size, batch_images);
         dataset.get_batch_labels(i, actual_batch_size, batch_labels);
 
         batch_images.reshape(
-            Shape({ actual_batch_size, input_shape_.channels,
-                    input_shape_.height, input_shape_.width }));
+            Shape({ actual_batch_size, input_shape_.channels, input_shape_.height, input_shape_.width }));
 
-        const Tensor &logits = model_.forward(batch_images, contexts, false);
+        const Tensor& logits = model_.forward(batch_images, contexts, false);
         auto predictions = Utils::argmax(logits);
 
         for (size_t b = 0; b < actual_batch_size; ++b)
@@ -360,11 +334,10 @@ scalar_t CNN::accuracy(const Dataset &dataset)
                 correct++;
         }
     }
-    return static_cast<scalar_t>(correct)
-        / static_cast<scalar_t>(dataset.count());
+    return static_cast<scalar_t>(correct) / static_cast<scalar_t>(dataset.count());
 }
 
-void CNN::save(const std::string &path) const
+void CNN::save(const std::string& path) const
 {
     std::ofstream file(path, std::ios::binary | std::ios::trunc);
     if (!file.is_open())
@@ -375,21 +348,17 @@ void CNN::save(const std::string &path) const
                               { "height", input_shape_.height },
                               { "width", input_shape_.width } };
 
-    header["hyperparameters"] = {
-        { "batch_size", hp_.batch_size },
-        { "loss",
-          (hp_.loss_type == LossType::CrossEntropy) ? "CrossEntropy" : "MSE" },
-        { "optimizer",
-          { { "type",
-              (hp_.optimizer_type == OptimizerType::SGD) ? "SGD" : "Adam" },
-            { "learning_rate", hp_.learning_rate },
-            { "beta1", hp_.beta1 },
-            { "beta2", hp_.beta2 },
-            { "epsilon", hp_.epsilon } } }
-    };
+    header["hyperparameters"] = { { "batch_size", hp_.batch_size },
+                                  { "loss", (hp_.loss_type == LossType::CrossEntropy) ? "CrossEntropy" : "MSE" },
+                                  { "optimizer",
+                                    { { "type", (hp_.optimizer_type == OptimizerType::SGD) ? "SGD" : "Adam" },
+                                      { "learning_rate", hp_.learning_rate },
+                                      { "beta1", hp_.beta1 },
+                                      { "beta2", hp_.beta2 },
+                                      { "epsilon", hp_.epsilon } } } };
 
     json layers_configs = json::array();
-    for (const auto &layer : model_.layers())
+    for (const auto& layer : model_.layers())
     {
         layers_configs.push_back(layer->get_config());
     }
@@ -400,20 +369,20 @@ void CNN::save(const std::string &path) const
     uint64_t header_len = header_str.length();
 
     file.write(MAGIC, 4);
-    file.write(reinterpret_cast<const char *>(&header_len), sizeof(header_len));
+    file.write(reinterpret_cast<const char*>(&header_len), sizeof(header_len));
     file.write(header_str.c_str(), header_len);
 
-    file.write(reinterpret_cast<const char *>(&data_mean_), sizeof(scalar_t));
-    file.write(reinterpret_cast<const char *>(&data_std_), sizeof(scalar_t));
+    file.write(reinterpret_cast<const char*>(&data_mean_), sizeof(scalar_t));
+    file.write(reinterpret_cast<const char*>(&data_std_), sizeof(scalar_t));
     uint8_t norm = normalize_input_ ? 1 : 0;
-    file.write(reinterpret_cast<const char *>(&norm), sizeof(norm));
+    file.write(reinterpret_cast<const char*>(&norm), sizeof(norm));
 
-    for (const auto &layer : model_.layers())
+    for (const auto& layer : model_.layers())
         layer->save(file);
     file.close();
 }
 
-void CNN::load_from_model(const std::string &path)
+void CNN::load_from_model(const std::string& path)
 {
     std::ifstream file(path, std::ios::binary);
     if (!file.is_open())
@@ -427,7 +396,7 @@ void CNN::load_from_model(const std::string &path)
     }
 
     uint64_t header_len_u64;
-    file.read(reinterpret_cast<char *>(&header_len_u64), sizeof(header_len_u64));
+    file.read(reinterpret_cast<char*>(&header_len_u64), sizeof(header_len_u64));
     size_t header_len = static_cast<size_t>(header_len_u64);
     std::string header_str(header_len, '\0');
     file.read(&header_str[0], header_len);
@@ -435,13 +404,13 @@ void CNN::load_from_model(const std::string &path)
     json header = json::parse(header_str);
     build_from_json(header);
 
-    file.read(reinterpret_cast<char *>(&data_mean_), sizeof(scalar_t));
-    file.read(reinterpret_cast<char *>(&data_std_), sizeof(scalar_t));
+    file.read(reinterpret_cast<char*>(&data_mean_), sizeof(scalar_t));
+    file.read(reinterpret_cast<char*>(&data_std_), sizeof(scalar_t));
     uint8_t norm;
-    file.read(reinterpret_cast<char *>(&norm), sizeof(norm));
+    file.read(reinterpret_cast<char*>(&norm), sizeof(norm));
     normalize_input_ = (norm != 0);
 
-    for (auto &layer : model_.layers())
+    for (auto& layer : model_.layers())
         layer->load(file);
     file.close();
 }
@@ -449,14 +418,12 @@ void CNN::load_from_model(const std::string &path)
 void CNN::print_architecture() const
 {
     std::cout << "CNN Architecture:\n";
-    std::cout << "  Input Shape: " << input_shape_.channels << "x"
-              << input_shape_.height << "x" << input_shape_.width << "\n";
+    std::cout << "  Input Shape: " << input_shape_.channels << "x" << input_shape_.height << "x" << input_shape_.width
+              << "\n";
     std::cout << "  Hyperparameters:\n";
     std::cout << "    Batch Size: " << hp_.batch_size << "\n";
     std::cout << "    Optimizer:\n";
-    std::cout << "      Type: "
-              << (hp_.optimizer_type == OptimizerType::SGD ? "SGD" : "Adam")
-              << "\n";
+    std::cout << "      Type: " << (hp_.optimizer_type == OptimizerType::SGD ? "SGD" : "Adam") << "\n";
     std::cout << "      Learning Rate: " << hp_.learning_rate << "\n";
     if (hp_.optimizer_type == OptimizerType::Adam)
     {
@@ -467,8 +434,7 @@ void CNN::print_architecture() const
     std::cout << "  Layers:\n";
     for (size_t i = 0; i < model_.layers().size(); ++i)
     {
-        std::cout << "    " << i + 1 << ". "
-                  << model_.layers()[i]->get_config().dump() << "\n";
+        std::cout << "    " << i + 1 << ". " << model_.layers()[i]->get_config().dump() << "\n";
     }
 
     if (!history_.empty())
@@ -476,8 +442,8 @@ void CNN::print_architecture() const
         std::cout << "  Training History:\n";
         for (size_t i = 0; i < history_.size(); ++i)
         {
-            const auto &h = history_[i];
-            auto get_f = [](const json &j, const char *k) -> std::string {
+            const auto& h = history_[i];
+            auto get_f = [](const json& j, const char* k) -> std::string {
                 if (j.contains(k) && j[k].is_number())
                 {
                     std::ostringstream oss;
@@ -487,24 +453,20 @@ void CNN::print_architecture() const
                 return "nan";
             };
 
-            std::cout << "    Session " << i + 1 << ": "
-                      << h.value("samples", 0UL) << " samples, "
+            std::cout << "    Session " << i + 1 << ": " << h.value("samples", 0UL) << " samples, "
                       << h.value("epochs", 0UL) << " epochs, "
                       << "loss: " << get_f(h, "final_loss") << ", "
                       << "acc: " << get_f(h, "final_accuracy") << "%\n";
 
-            const auto &hp = h["hyperparameters"];
-            const auto &opt = hp["optimizer"];
+            const auto& hp = h["hyperparameters"];
+            const auto& opt = hp["optimizer"];
 
-            std::cout << "      Batch Size: " << hp.value("batch_size", 0UL)
-                      << "\n"
-                      << "      Optimizer: " << opt.value("type", "Unknown")
-                      << " (lr=" << get_f(opt, "learning_rate");
+            std::cout << "      Batch Size: " << hp.value("batch_size", 0UL) << "\n"
+                      << "      Optimizer: " << opt.value("type", "Unknown") << " (lr=" << get_f(opt, "learning_rate");
 
             if (opt.value("type", "Adam") == "Adam")
             {
-                std::cout << ", beta1=" << get_f(opt, "beta1")
-                          << ", beta2=" << get_f(opt, "beta2")
+                std::cout << ", beta1=" << get_f(opt, "beta1") << ", beta2=" << get_f(opt, "beta2")
                           << ", eps=" << get_f(opt, "epsilon");
             }
             std::cout << ")\n";
@@ -512,7 +474,7 @@ void CNN::print_architecture() const
     }
 }
 
-void CNN::set_hyperparameters(const Hyperparameters &hp)
+void CNN::set_hyperparameters(const Hyperparameters& hp)
 {
     hp_ = hp;
     if (hp_.optimizer_type == OptimizerType::SGD)
@@ -521,7 +483,6 @@ void CNN::set_hyperparameters(const Hyperparameters &hp)
     }
     else
     {
-        model_.set_optimizer(std::make_unique<AdamOptimizer>(
-            hp_.learning_rate, hp_.beta1, hp_.beta2, hp_.epsilon));
+        model_.set_optimizer(std::make_unique<AdamOptimizer>(hp_.learning_rate, hp_.beta1, hp_.beta2, hp_.epsilon));
     }
 }

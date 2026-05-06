@@ -12,11 +12,11 @@ private:
     scalar_t learning_rate_;
 
 protected:
-    std::vector<Tensor *> weights_;
-    std::vector<Tensor *> gradients_;
+    std::vector<Tensor*> weights_;
+    std::vector<Tensor*> gradients_;
 
 public:
-    Optimizer(scalar_t learning_rate = 0.0f)
+    explicit Optimizer(scalar_t learning_rate = 0.0f) noexcept
         : learning_rate_(learning_rate)
     {}
     virtual ~Optimizer() = default;
@@ -24,17 +24,16 @@ public:
     virtual void step() = 0;
     virtual void reset()
     {}
-    virtual void set_learning_rate(scalar_t lr)
+    virtual void set_learning_rate(scalar_t lr) noexcept
     {
         learning_rate_ = lr;
     }
-    scalar_t learning_rate() const
+    scalar_t learning_rate() const noexcept
     {
         return learning_rate_;
     }
 
-    virtual void set_parameters(const std::vector<Tensor *> &weights,
-                                const std::vector<Tensor *> &grads)
+    virtual void set_parameters(const std::vector<Tensor*>& weights, const std::vector<Tensor*>& grads)
     {
         weights_ = weights;
         gradients_ = grads;
