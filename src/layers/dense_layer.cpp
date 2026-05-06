@@ -30,7 +30,7 @@ const Tensor &DenseLayer::forward(const Tensor &input,
 
     if (is_training)
     {
-        dense_ctx->input = input;
+        dense_ctx->input_ptr = &input;
     }
 
     if (dense_ctx->activations.rank() != 2
@@ -62,6 +62,7 @@ const Tensor &DenseLayer::backward(const Tensor &gradient,
 {
     assert(is_training
            && "Backward doit uniquement etre appele durant l'entrainement !");
+    (void)is_training;
     auto *dense_ctx = static_cast<DenseContext *>(ctx.get());
     size_t batch_size = gradient.shape()[0];
 
@@ -78,7 +79,8 @@ const Tensor &DenseLayer::backward(const Tensor &gradient,
         weights_grad_.reshape(weights_.shape());
         biases_grad_.reshape(biases_.shape());
     }
-    Tensor::matmul(gradient, dense_ctx->input, weights_grad_, true, false);
+    assert(dense_ctx->input_ptr != nullptr);
+    Tensor::matmul(gradient, *(dense_ctx->input_ptr), weights_grad_, true, false);
 
     biases_grad_.fill(0.0f);
     const scalar_t *grad_ptr = gradient.data_ptr();

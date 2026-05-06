@@ -6,6 +6,7 @@
 
 struct BatchNormContext : public LayerContext
 {
+    Tensor x_hat;
     Tensor normalized;
     Tensor grad_input;
     Tensor saved_mean;

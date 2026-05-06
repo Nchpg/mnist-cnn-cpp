@@ -24,11 +24,11 @@ private:
     }
 
 public:
-    static scalar_t mean_;
-    static scalar_t std_;
-    static bool normalize_;
+    scalar_t mean_ = 0.0f;
+    scalar_t std_ = 1.0f;
+    bool normalize_ = false;
 
-    static void compute_normalization(const std::vector<scalar_t> &images_data);
+    void compute_normalization(const std::vector<scalar_t> &images_data);
     void apply_normalization();
 
     const std::vector<scalar_t> &images_data() const
@@ -36,15 +36,15 @@ public:
         return all_images_data_;
     }
 
-    static scalar_t mean()
+    scalar_t mean() const
     {
         return mean_;
     }
-    static scalar_t std()
+    scalar_t std() const
     {
         return std_;
     }
-    static bool normalize()
+    bool normalize() const
     {
         return normalize_;
     }

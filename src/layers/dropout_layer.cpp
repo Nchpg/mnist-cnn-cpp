@@ -2,9 +2,8 @@
 
 #include <cassert>
 
-DropoutLayer::DropoutLayer(scalar_t ratio, std::mt19937 &gen)
+DropoutLayer::DropoutLayer(scalar_t ratio)
     : ratio_(ratio)
-    , local_gen_(gen)
 {}
 
 const Tensor &DropoutLayer::forward(const Tensor &input,
@@ -34,7 +33,10 @@ const Tensor &DropoutLayer::forward(const Tensor &input,
     scalar_t *mask_ptr = dropout_ctx->mask.data_ptr();
     scalar_t *out_ptr = dropout_ctx->output.data_ptr();
 
-    static thread_local std::mt19937 gen(local_gen_());
+    static thread_local std::mt19937 gen([] {
+        std::random_device rd;
+        return rd();
+    }());
     std::uniform_real_distribution<scalar_t> dist(0.0f, 1.0f);
 
 #pragma omp parallel for if (n > 10000)
@@ -60,6 +62,7 @@ const Tensor &DropoutLayer::backward(const Tensor &gradient,
 {
     assert(is_training
            && "Backward doit uniquement etre appele durant l'entrainement !");
+    (void)is_training;
     auto *dropout_ctx = static_cast<DropoutContext *>(ctx.get());
 
     if (dropout_ctx->grad_input.shape() != gradient.shape())

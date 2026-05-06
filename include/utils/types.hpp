@@ -43,15 +43,21 @@ public:
         dims_.fill(0);
     }
     Shape(std::initializer_list<size_t> dims)
-        : rank_(dims.size())
     {
+        if (dims.size() > MAX_DIMS)
+            throw std::invalid_argument("Shape rank exceeds MAX_DIMS");
+        rank_ = dims.size();
+        dims_.fill(0);
         size_t i = 0;
         for (size_t d : dims)
             dims_[i++] = d;
     }
     Shape(const std::vector<size_t> &dims)
-        : rank_(dims.size())
     {
+        if (dims.size() > MAX_DIMS)
+            throw std::invalid_argument("Shape rank exceeds MAX_DIMS");
+        rank_ = dims.size();
+        dims_.fill(0);
         for (size_t i = 0; i < rank_; ++i)
             dims_[i] = dims[i];
     }
@@ -76,6 +82,8 @@ public:
     }
     size_t size() const
     {
+        if (rank_ == 0)
+            return 0;
         size_t s = 1;
         for (size_t i = 0; i < rank_; ++i)
             s *= dims_[i];

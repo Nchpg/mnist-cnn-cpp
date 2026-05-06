@@ -16,10 +16,9 @@ class DropoutLayer : public Layer
 {
 private:
     scalar_t ratio_;
-    std::mt19937 &local_gen_;
 
 public:
-    DropoutLayer(scalar_t ratio, std::mt19937 &gen);
+    DropoutLayer(scalar_t ratio);
     ~DropoutLayer() override = default;
 
     const Tensor &forward(const Tensor &input,

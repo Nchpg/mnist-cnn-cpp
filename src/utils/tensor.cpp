@@ -31,9 +31,15 @@ Tensor::Tensor(std::initializer_list<size_t> dims, scalar_t init_val)
 
 void Tensor::reshape(Shape new_shape)
 {
-    if (new_shape.size() != shape_.size())
+    size_t new_size = new_shape.size();
+    size_t old_size = data_.size();
+    if (new_size != old_size)
     {
-        data_.resize(new_shape.size());
+        data_.resize(new_size, 0.0f);
+        if (new_size > old_size)
+        {
+            std::fill(data_.begin() + old_size, data_.end(), 0.0f);
+        }
     }
     shape_ = new_shape;
     compute_strides();
@@ -41,9 +47,15 @@ void Tensor::reshape(Shape new_shape)
 
 void Tensor::reshape(Shape new_shape, scalar_t init_val)
 {
-    if (new_shape.size() != shape_.size())
+    size_t new_size = new_shape.size();
+    size_t old_size = data_.size();
+    if (new_size != old_size)
     {
-        data_.resize(new_shape.size(), init_val);
+        data_.resize(new_size, init_val);
+        if (new_size > old_size)
+        {
+            std::fill(data_.begin() + old_size, data_.end(), init_val);
+        }
     }
     shape_ = new_shape;
     compute_strides();
@@ -169,21 +181,29 @@ void Tensor::matmul(const Tensor &A, const Tensor &B, Tensor &C, bool transA,
 
 scalar_t &Tensor::operator()(size_t n, size_t c, size_t h, size_t w)
 {
-    return data_[((n * shape_[1] + c) * shape_[2] + h) * shape_[3] + w];
+    assert(rank() == 4);
+    assert(n < shape_[0] && c < shape_[1] && h < shape_[2] && w < shape_[3]);
+    return data_[n * strides_[0] + c * strides_[1] + h * strides_[2] + w];
 }
 
 const scalar_t &Tensor::operator()(size_t n, size_t c, size_t h, size_t w) const
 {
-    return data_[((n * shape_[1] + c) * shape_[2] + h) * shape_[3] + w];
+    assert(rank() == 4);
+    assert(n < shape_[0] && c < shape_[1] && h < shape_[2] && w < shape_[3]);
+    return data_[n * strides_[0] + c * strides_[1] + h * strides_[2] + w];
 }
 
 scalar_t &Tensor::operator()(size_t i, size_t j)
 {
+    assert(rank() == 2);
+    assert(i < shape_[0] && j < shape_[1]);
     return data_[i * strides_[0] + j];
 }
 
 const scalar_t &Tensor::operator()(size_t i, size_t j) const
 {
+    assert(rank() == 2);
+    assert(i < shape_[0] && j < shape_[1]);
     return data_[i * strides_[0] + j];
 }
 
@@ -191,9 +211,9 @@ void Tensor::save(std::ostream &os) const
 {
     uint64_t r = rank();
     os.write(reinterpret_cast<const char *>(&r), sizeof(r));
-    for (size_t d : shape_.dims())
+    for (size_t i = 0; i < r; ++i)
     {
-        uint64_t dim = d;
+        uint64_t dim = shape_[i];
         os.write(reinterpret_cast<const char *>(&dim), sizeof(dim));
     }
     os.write(reinterpret_cast<const char *>(data_.data()),
@@ -203,15 +223,23 @@ void Tensor::save(std::ostream &os) const
 void Tensor::load(std::istream &is)
 {
     uint64_t r;
-    is.read(reinterpret_cast<char *>(&r), sizeof(r));
+    if (!is.read(reinterpret_cast<char *>(&r), sizeof(r)))
+        throw std::runtime_error("Tensor load failed: cannot read rank");
+
+    if (r > MAX_DIMS)
+        throw std::runtime_error("Tensor load failed: rank exceeds MAX_DIMS");
+
     std::vector<size_t> dims(r);
     for (size_t i = 0; i < r; ++i)
     {
         uint64_t d;
-        is.read(reinterpret_cast<char *>(&d), sizeof(d));
+        if (!is.read(reinterpret_cast<char *>(&d), sizeof(d)))
+            throw std::runtime_error("Tensor load failed: cannot read dimension");
         dims[i] = d;
     }
+
     reshape(Shape(dims));
-    is.read(reinterpret_cast<char *>(data_.data()),
-            data_.size() * sizeof(scalar_t));
+    if (!is.read(reinterpret_cast<char *>(data_.data()),
+                 data_.size() * sizeof(scalar_t)))
+        throw std::runtime_error("Tensor load failed: truncated data");
 }

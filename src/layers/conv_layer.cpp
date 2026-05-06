@@ -42,9 +42,18 @@ const Tensor &ConvLayer::forward(const Tensor &input,
         conv_ctx->output.reshape(Shape({ batch_size, out_c_, out_h_, out_w_ }));
     }
 
-    if (conv_ctx->col_buffer.shape().rank() == 0
-        || conv_ctx->col_buffer.shape()[1] != batch_size * out_h_ * out_w_)
+    size_t required_col_size =
+        (in_c_ * k_size_ * k_size_) * (batch_size * out_h_ * out_w_);
+    if (conv_ctx->col_buffer.size() < required_col_size)
     {
+        conv_ctx->col_buffer.reshape(
+            Shape({ in_c_ * k_size_ * k_size_, batch_size * out_h_ * out_w_ }));
+        conv_ctx->gemm_out.reshape(
+            Shape({ out_c_, batch_size * out_h_ * out_w_ }));
+    }
+    else
+    {
+        // Use Shape to avoid reallocating if size is enough
         conv_ctx->col_buffer.reshape(
             Shape({ in_c_ * k_size_ * k_size_, batch_size * out_h_ * out_w_ }));
         conv_ctx->gemm_out.reshape(
@@ -104,6 +113,7 @@ const Tensor &ConvLayer::backward(const Tensor &gradient,
 {
     assert(is_training
            && "Backward doit uniquement etre appele durant l'entrainement !");
+    (void)is_training;
     auto *conv_ctx = static_cast<ConvContext *>(ctx.get());
 
     size_t batch_size = gradient.shape()[0];
@@ -122,8 +132,15 @@ const Tensor &ConvLayer::backward(const Tensor &gradient,
         biases_grad_.reshape(biases_.shape());
     }
 
-    if (conv_ctx->grad_view.shape().rank() == 0
-        || conv_ctx->grad_view.shape()[1] != batch_size * out_h_ * out_w_)
+    size_t required_grad_size = out_c_ * (batch_size * out_h_ * out_w_);
+    if (conv_ctx->grad_view.size() < required_grad_size)
+    {
+        conv_ctx->grad_view.reshape(
+            Shape({ out_c_, batch_size * out_h_ * out_w_ }));
+        conv_ctx->grad_col.reshape(
+            Shape({ in_c_ * k_size_ * k_size_, batch_size * out_h_ * out_w_ }));
+    }
+    else
     {
         conv_ctx->grad_view.reshape(
             Shape({ out_c_, batch_size * out_h_ * out_w_ }));
@@ -247,11 +264,6 @@ void ConvLayer::load(std::istream &is)
 
     filters_.load(is);
     biases_.load(is);
-
-    if (filters_.shape().rank() == 4)
-    {
-        filters_.reshape(Shape({ out_c_, in_c_ * k_size_ * k_size_ }));
-    }
 }
 
 nlohmann::json ConvLayer::get_config() const

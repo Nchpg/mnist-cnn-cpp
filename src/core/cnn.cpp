@@ -144,7 +144,7 @@ void CNN::build_from_json(const nlohmann::json &config_data)
         else if (type == "Dropout")
         {
             scalar_t ratio = layer_def["ratio"];
-            auto layer = std::make_unique<DropoutLayer>(ratio, gen_);
+            auto layer = std::make_unique<DropoutLayer>(ratio);
             current_shape = layer->get_output_shape(current_shape);
             model_.add(std::move(layer));
         }
@@ -171,7 +171,7 @@ std::vector<scalar_t> CNN::predict(const Tensor &image) const
     img_batch.reshape(Shape(
         { 1, input_shape_.channels, input_shape_.height, input_shape_.width }));
 
-    thread_local std::vector<std::unique_ptr<LayerContext>> contexts;
+    std::vector<std::unique_ptr<LayerContext>> contexts;
     const Tensor &probs = model_.forward(img_batch, contexts, false);
 
     std::vector<scalar_t> result(probs.shape()[1]);
@@ -186,7 +186,7 @@ int CNN::predict_label(const Tensor &image) const
     img_batch.reshape(Shape(
         { 1, input_shape_.channels, input_shape_.height, input_shape_.width }));
 
-    thread_local std::vector<std::unique_ptr<LayerContext>> contexts;
+    std::vector<std::unique_ptr<LayerContext>> contexts;
     const Tensor &probs = model_.forward(img_batch, contexts, false);
     auto results = Utils::argmax(probs);
     return static_cast<int>(results[0]);
@@ -397,7 +397,7 @@ void CNN::save(const std::string &path) const
     header["history"] = history_;
 
     std::string header_str = header.dump();
-    size_t header_len = header_str.length();
+    uint64_t header_len = header_str.length();
 
     file.write(MAGIC, 4);
     file.write(reinterpret_cast<const char *>(&header_len), sizeof(header_len));
@@ -405,7 +405,8 @@ void CNN::save(const std::string &path) const
 
     file.write(reinterpret_cast<const char *>(&data_mean_), sizeof(scalar_t));
     file.write(reinterpret_cast<const char *>(&data_std_), sizeof(scalar_t));
-    file.write(reinterpret_cast<const char *>(&normalize_input_), sizeof(bool));
+    uint8_t norm = normalize_input_ ? 1 : 0;
+    file.write(reinterpret_cast<const char *>(&norm), sizeof(norm));
 
     for (const auto &layer : model_.layers())
         layer->save(file);
@@ -425,8 +426,9 @@ void CNN::load_from_model(const std::string &path)
         throw std::runtime_error("Unsupported model format or bad magic");
     }
 
-    size_t header_len;
-    file.read(reinterpret_cast<char *>(&header_len), sizeof(header_len));
+    uint64_t header_len_u64;
+    file.read(reinterpret_cast<char *>(&header_len_u64), sizeof(header_len_u64));
+    size_t header_len = static_cast<size_t>(header_len_u64);
     std::string header_str(header_len, '\0');
     file.read(&header_str[0], header_len);
 
@@ -435,7 +437,9 @@ void CNN::load_from_model(const std::string &path)
 
     file.read(reinterpret_cast<char *>(&data_mean_), sizeof(scalar_t));
     file.read(reinterpret_cast<char *>(&data_std_), sizeof(scalar_t));
-    file.read(reinterpret_cast<char *>(&normalize_input_), sizeof(bool));
+    uint8_t norm;
+    file.read(reinterpret_cast<char *>(&norm), sizeof(norm));
+    normalize_input_ = (norm != 0);
 
     for (auto &layer : model_.layers())
         layer->load(file);

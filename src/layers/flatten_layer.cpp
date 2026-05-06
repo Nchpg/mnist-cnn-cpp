@@ -46,12 +46,10 @@ void FlattenLayer::save(std::ostream &os) const
 {
     uint32_t marker = make_marker("FLAT");
     os.write(reinterpret_cast<const char *>(&marker), sizeof(marker));
-    os.write(reinterpret_cast<const char *>(&input_channels_),
-             sizeof(input_channels_));
-    os.write(reinterpret_cast<const char *>(&input_height_),
-             sizeof(input_height_));
-    os.write(reinterpret_cast<const char *>(&input_width_),
-             sizeof(input_width_));
+    uint64_t c = input_channels_, h = input_height_, w = input_width_;
+    os.write(reinterpret_cast<const char *>(&c), sizeof(c));
+    os.write(reinterpret_cast<const char *>(&h), sizeof(h));
+    os.write(reinterpret_cast<const char *>(&w), sizeof(w));
 }
 
 void FlattenLayer::load(std::istream &is)
@@ -60,10 +58,13 @@ void FlattenLayer::load(std::istream &is)
     is.read(reinterpret_cast<char *>(&marker), sizeof(marker));
     if (marker != make_marker("FLAT"))
         throw std::runtime_error("Architecture mismatch in FlattenLayer load");
-    is.read(reinterpret_cast<char *>(&input_channels_),
-            sizeof(input_channels_));
-    is.read(reinterpret_cast<char *>(&input_height_), sizeof(input_height_));
-    is.read(reinterpret_cast<char *>(&input_width_), sizeof(input_width_));
+    uint64_t c, h, w;
+    is.read(reinterpret_cast<char *>(&c), sizeof(c));
+    is.read(reinterpret_cast<char *>(&h), sizeof(h));
+    is.read(reinterpret_cast<char *>(&w), sizeof(w));
+    input_channels_ = c;
+    input_height_ = h;
+    input_width_ = w;
 }
 
 nlohmann::json FlattenLayer::get_config() const

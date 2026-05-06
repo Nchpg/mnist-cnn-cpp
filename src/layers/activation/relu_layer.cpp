@@ -15,10 +15,14 @@ const Tensor &ReluLayer::forward(const Tensor &input,
     }
     auto *relu_ctx = static_cast<ReluContext *>(ctx.get());
 
+    if (is_training)
+    {
+        relu_ctx->input = input;
+    }
+
     relu_ctx->output.reshape(input.shape());
     Activation::relu(input, relu_ctx->output);
 
-    (void)is_training;
     return relu_ctx->output;
 }
 
@@ -26,10 +30,10 @@ const Tensor &ReluLayer::backward(const Tensor &gradient,
                                   std::unique_ptr<LayerContext> &ctx,
                                   bool is_training)
 {
+    (void)is_training;
     auto *relu_ctx = static_cast<ReluContext *>(ctx.get());
     relu_ctx->grad_input.reshape(gradient.shape());
-    Activation::relu_backward(relu_ctx->output, gradient, relu_ctx->grad_input);
-    (void)is_training;
+    Activation::relu_backward(relu_ctx->input, gradient, relu_ctx->grad_input);
     return relu_ctx->grad_input;
 }
 

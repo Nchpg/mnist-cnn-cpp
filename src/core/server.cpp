@@ -31,6 +31,7 @@ using json = nlohmann::json;
 #define DEFAULT_PORT 8080
 #define THREAD_POOL_SIZE 4
 #define HEADER_BUFFER_SIZE 4096
+#define MAX_BODY_SIZE (1024 * 1024)
 
 static volatile sig_atomic_t keep_running = 1;
 
@@ -149,9 +150,11 @@ static bool parse_pixels(const std::string &body, Tensor &image, const CNN &cnn)
         for (size_t i = 0; i < PIXELS; i++)
         {
             scalar_t raw = static_cast<scalar_t>(pixels[i]) / NORMALIZE_DIVISOR;
-            size_t row = i / IMG_HEIGHT;
-            size_t col = i % IMG_HEIGHT;
-            image(row * IMG_HEIGHT + col, 0) =
+            size_t row = i / IMG_WIDTH;
+            size_t col = i % IMG_WIDTH;
+            // EMNIST / MNIST binary files often store images transposed (column-major)
+            // Transposing here ensures the web input matches the training data distribution.
+            image(col * IMG_HEIGHT + row, 0) =
                 cnn.normalize() ? (raw - cnn.mean()) / cnn.std() : raw;
         }
         return true;
@@ -200,6 +203,16 @@ static void handle_predict(int client_fd, const CNN &cnn,
 
 static void handle_client(int client_fd, const CNN &cnn)
 {
+    // Set a receive timeout for robustness
+    struct timeval tv;
+    tv.tv_sec = 5;
+    tv.tv_usec = 0;
+    setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof(tv));
+
+    // Revert to blocking mode for synchronous handling in the thread pool
+    int flags = fcntl(client_fd, F_GETFL, 0);
+    fcntl(client_fd, F_SETFL, flags & ~O_NONBLOCK);
+
     std::string request;
     char buffer[HEADER_BUFFER_SIZE];
     ssize_t received = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
@@ -246,6 +259,14 @@ static void handle_client(int client_fd, const CNN &cnn)
             }
         }
 
+        if (content_length > MAX_BODY_SIZE)
+        {
+            send_response(client_fd, "413 Payload Too Large", "text/plain",
+                          "payload too large\n");
+            close(client_fd);
+            return;
+        }
+
         while (body.length() < content_length)
         {
             received = recv(client_fd, buffer, sizeof(buffer), 0);
@@ -253,6 +274,13 @@ static void handle_client(int client_fd, const CNN &cnn)
                 break;
             body.append(buffer, received);
         }
+
+        if (body.length() < content_length)
+        {
+            close(client_fd);
+            return;
+        }
+
         handle_predict(client_fd, cnn, body);
     }
     close(client_fd);

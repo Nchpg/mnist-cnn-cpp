@@ -27,6 +27,7 @@ const Tensor &BatchNormLayer::forward(const Tensor &input,
     if (bn_ctx->normalized.shape().rank() == 0
         || bn_ctx->normalized.shape()[0] != batch_size)
     {
+        bn_ctx->x_hat.reshape(input.shape());
         bn_ctx->normalized.reshape(input.shape());
         bn_ctx->saved_mean.reshape(Shape({ channels_, 1 }));
         bn_ctx->saved_var.reshape(Shape({ channels_, 1 }));
@@ -87,22 +88,6 @@ const Tensor &BatchNormLayer::forward(const Tensor &input,
             is_training ? bn_ctx->saved_var(c, 0) : running_var_(c, 0);
         scalar_t std_inv = 1.0f / std::sqrt(var_to_use + epsilon_);
 
-        for (size_t b = 0; b < batch_size; ++b)
-        {
-            for (size_t y = 0; y < height; ++y)
-            {
-                for (size_t x = 0; x < width; ++x)
-                {
-                    scalar_t x_hat =
-                        (input(b, c, y, x) - mean_to_use) * std_inv;
-                    bn_ctx->normalized(b, c, y, x) = x_hat;
-                }
-            }
-        }
-    }
-
-    for (size_t c = 0; c < channels_; ++c)
-    {
         scalar_t gamma_c = gamma_(c, 0);
         scalar_t beta_c = beta_(c, 0);
 
@@ -112,8 +97,11 @@ const Tensor &BatchNormLayer::forward(const Tensor &input,
             {
                 for (size_t x = 0; x < width; ++x)
                 {
-                    scalar_t x_hat = bn_ctx->normalized(b, c, y, x);
-                    bn_ctx->normalized(b, c, y, x) = x_hat * gamma_c + beta_c;
+                    scalar_t val_x_hat =
+                        (input(b, c, y, x) - mean_to_use) * std_inv;
+                    bn_ctx->x_hat(b, c, y, x) = val_x_hat;
+                    bn_ctx->normalized(b, c, y, x) =
+                        val_x_hat * gamma_c + beta_c;
                 }
             }
         }
@@ -128,6 +116,7 @@ const Tensor &BatchNormLayer::backward(const Tensor &gradient,
 {
     assert(is_training
            && "Backward doit uniquement etre appele durant l'entrainement !");
+    (void)is_training;
     auto *bn_ctx = static_cast<BatchNormContext *>(ctx.get());
 
     size_t batch_size = gradient.shape()[0];
@@ -161,7 +150,7 @@ const Tensor &BatchNormLayer::backward(const Tensor &gradient,
                 {
                     scalar_t dy = gradient(b, c, y, x);
                     sum_dy += dy;
-                    sum_dy_xhat += dy * bn_ctx->normalized(b, c, y, x);
+                    sum_dy_xhat += dy * bn_ctx->x_hat(b, c, y, x);
                 }
             }
         }
@@ -180,10 +169,10 @@ const Tensor &BatchNormLayer::backward(const Tensor &gradient,
                 for (size_t x = 0; x < width; ++x)
                 {
                     scalar_t dy = gradient(b, c, y, x);
-                    scalar_t x_hat = bn_ctx->normalized(b, c, y, x);
+                    scalar_t val_x_hat = bn_ctx->x_hat(b, c, y, x);
 
                     scalar_t dx =
-                        coef * (dy - (sum_dy / N) - x_hat * (sum_dy_xhat / N));
+                        coef * (dy - (sum_dy / N) - val_x_hat * (sum_dy_xhat / N));
                     bn_ctx->grad_input(b, c, y, x) = dx;
                 }
             }

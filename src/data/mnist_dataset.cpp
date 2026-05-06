@@ -13,10 +13,6 @@
 
 #include "data/constants.hpp"
 
-scalar_t MnistDataset::mean_ = 0.0f;
-scalar_t MnistDataset::std_ = 1.0f;
-bool MnistDataset::normalize_ = false;
-
 void MnistDataset::compute_normalization(
     const std::vector<scalar_t> &images_data)
 {

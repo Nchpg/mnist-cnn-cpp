@@ -90,6 +90,7 @@ const Tensor &PoolingLayer::backward(const Tensor &gradient,
 {
     assert(is_training
            && "Backward doit uniquement etre appele durant l'entrainement !");
+    (void)is_training;
     auto *pool_ctx = static_cast<PoolingContext *>(ctx.get());
 
     size_t batch_size = gradient.shape()[0];
@@ -116,6 +117,7 @@ const Tensor &PoolingLayer::backward(const Tensor &gradient,
                     size_t in_r = max_in_idx / in_w_;
                     size_t in_c = max_in_idx % in_w_;
 
+#pragma omp atomic
                     pool_ctx->grad_input(b, c, in_r, in_c) +=
                         gradient(b, c, i, j);
                 }

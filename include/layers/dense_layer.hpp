@@ -7,7 +7,7 @@
 
 struct DenseContext : public LayerContext
 {
-    Tensor input;
+    const Tensor *input_ptr = nullptr;
     Tensor activations;
     Tensor grad_input;
 };

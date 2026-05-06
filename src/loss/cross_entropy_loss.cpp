@@ -7,10 +7,11 @@ scalar_t CrossEntropyLoss::forward(const Tensor &predictions,
                                    const std::vector<size_t> &targets)
 {
     size_t batch_size = predictions.shape()[0];
-    size_t num_classes = predictions.shape()[1];
     if (targets.size() != batch_size)
         throw std::invalid_argument("Targets size must match batch size");
 
+#ifndef NDEBUG
+    size_t num_classes = predictions.shape()[1];
     const scalar_t sum_tol = 0.01f;
     for (size_t b = 0; b < batch_size; ++b)
     {
@@ -30,6 +31,7 @@ scalar_t CrossEntropyLoss::forward(const Tensor &predictions,
                 + std::to_string(row_sum));
         }
     }
+#endif
 
     scalar_t total_loss = 0.0f;
     const scalar_t epsilon = 1e-7f;

@@ -6,6 +6,7 @@
 
 struct ReluContext : public LayerContext
 {
+    Tensor input;
     Tensor output;
     Tensor grad_input;
 };
