@@ -9,8 +9,8 @@ SoftmaxLayer::~SoftmaxLayer()
 {}
 
 const Tensor &SoftmaxLayer::forward(const Tensor &input,
-                                       std::unique_ptr<LayerContext> &ctx,
-                                       bool is_training) const
+                                    std::unique_ptr<LayerContext> &ctx,
+                                    bool is_training) const
 {
     if (!ctx)
     {
@@ -26,8 +26,8 @@ const Tensor &SoftmaxLayer::forward(const Tensor &input,
 }
 
 const Tensor &SoftmaxLayer::backward(const Tensor &gradient,
-                                      std::unique_ptr<LayerContext> &ctx,
-                                      bool is_training)
+                                     std::unique_ptr<LayerContext> &ctx,
+                                     bool is_training)
 {
     auto *softmax_ctx = static_cast<SoftmaxContext *>(ctx.get());
     softmax_ctx->grad_input.reshape(gradient.shape());

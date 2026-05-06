@@ -20,12 +20,12 @@ public:
     ~ReluLayer() override = default;
 
     const Tensor &forward(const Tensor &input,
-                         std::unique_ptr<LayerContext> &ctx,
-                         bool is_training) const override;
+                          std::unique_ptr<LayerContext> &ctx,
+                          bool is_training) const override;
 
     const Tensor &backward(const Tensor &gradient,
-                          std::unique_ptr<LayerContext> &ctx,
-                          bool is_training) override;
+                           std::unique_ptr<LayerContext> &ctx,
+                           bool is_training) override;
 
     void save(std::ostream &os) const override;
     void load(std::istream &is) override;

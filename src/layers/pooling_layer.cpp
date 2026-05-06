@@ -16,8 +16,8 @@ PoolingLayer::PoolingLayer(size_t input_h, size_t input_w, size_t input_c,
 }
 
 const Tensor &PoolingLayer::forward(const Tensor &input,
-                                     std::unique_ptr<LayerContext> &ctx,
-                                     bool is_training) const
+                                    std::unique_ptr<LayerContext> &ctx,
+                                    bool is_training) const
 {
     if (!ctx)
     {
@@ -85,17 +85,19 @@ const Tensor &PoolingLayer::forward(const Tensor &input,
 }
 
 const Tensor &PoolingLayer::backward(const Tensor &gradient,
-                                      std::unique_ptr<LayerContext> &ctx,
-                                      bool is_training)
+                                     std::unique_ptr<LayerContext> &ctx,
+                                     bool is_training)
 {
-    assert(is_training && "Backward doit uniquement etre appele durant l'entrainement !");
+    assert(is_training
+           && "Backward doit uniquement etre appele durant l'entrainement !");
     auto *pool_ctx = static_cast<PoolingContext *>(ctx.get());
 
     size_t batch_size = gradient.shape()[0];
     if (pool_ctx->grad_input.shape().rank() == 0
         || pool_ctx->grad_input.shape()[0] != batch_size)
     {
-        pool_ctx->grad_input.reshape(Shape({batch_size, in_c_, in_h_, in_w_}));
+        pool_ctx->grad_input.reshape(
+            Shape({ batch_size, in_c_, in_h_, in_w_ }));
     }
     pool_ctx->grad_input.fill(0.0f);
 
@@ -114,8 +116,8 @@ const Tensor &PoolingLayer::backward(const Tensor &gradient,
                     size_t in_r = max_in_idx / in_w_;
                     size_t in_c = max_in_idx % in_w_;
 
-                    pool_ctx->grad_input(b, c, in_r, in_c)
-                        += gradient(b, c, i, j);
+                    pool_ctx->grad_input(b, c, in_r, in_c) +=
+                        gradient(b, c, i, j);
                 }
             }
         }

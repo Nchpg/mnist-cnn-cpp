@@ -18,8 +18,8 @@ public:
     virtual ~Layer() = default;
 
     virtual const Tensor &forward(const Tensor &input,
-                                   std::unique_ptr<LayerContext> &ctx,
-                                   bool is_training) const = 0;
+                                  std::unique_ptr<LayerContext> &ctx,
+                                  bool is_training) const = 0;
     virtual const Tensor &backward(const Tensor &gradient,
                                    std::unique_ptr<LayerContext> &ctx,
                                    bool is_training) = 0;

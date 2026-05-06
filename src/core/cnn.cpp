@@ -403,12 +403,9 @@ void CNN::save(const std::string &path) const
     file.write(reinterpret_cast<const char *>(&header_len), sizeof(header_len));
     file.write(header_str.c_str(), header_len);
 
-    file.write(reinterpret_cast<const char *>(&data_mean_),
-               sizeof(scalar_t));
-    file.write(reinterpret_cast<const char *>(&data_std_),
-               sizeof(scalar_t));
-    file.write(reinterpret_cast<const char *>(&normalize_input_),
-               sizeof(bool));
+    file.write(reinterpret_cast<const char *>(&data_mean_), sizeof(scalar_t));
+    file.write(reinterpret_cast<const char *>(&data_std_), sizeof(scalar_t));
+    file.write(reinterpret_cast<const char *>(&normalize_input_), sizeof(bool));
 
     for (const auto &layer : model_.layers())
         layer->save(file);
@@ -438,8 +435,7 @@ void CNN::load_from_model(const std::string &path)
 
     file.read(reinterpret_cast<char *>(&data_mean_), sizeof(scalar_t));
     file.read(reinterpret_cast<char *>(&data_std_), sizeof(scalar_t));
-    file.read(reinterpret_cast<char *>(&normalize_input_),
-               sizeof(bool));
+    file.read(reinterpret_cast<char *>(&normalize_input_), sizeof(bool));
 
     for (auto &layer : model_.layers())
         layer->load(file);

@@ -8,8 +8,8 @@ DropoutLayer::DropoutLayer(scalar_t ratio, std::mt19937 &gen)
 {}
 
 const Tensor &DropoutLayer::forward(const Tensor &input,
-                                       std::unique_ptr<LayerContext> &ctx,
-                                       bool is_training) const
+                                    std::unique_ptr<LayerContext> &ctx,
+                                    bool is_training) const
 {
     if (!ctx)
     {
@@ -55,10 +55,11 @@ const Tensor &DropoutLayer::forward(const Tensor &input,
 }
 
 const Tensor &DropoutLayer::backward(const Tensor &gradient,
-                                      std::unique_ptr<LayerContext> &ctx,
-                                      bool is_training)
+                                     std::unique_ptr<LayerContext> &ctx,
+                                     bool is_training)
 {
-    assert(is_training && "Backward doit uniquement etre appele durant l'entrainement !");
+    assert(is_training
+           && "Backward doit uniquement etre appele durant l'entrainement !");
     auto *dropout_ctx = static_cast<DropoutContext *>(ctx.get());
 
     if (dropout_ctx->grad_input.shape() != gradient.shape())

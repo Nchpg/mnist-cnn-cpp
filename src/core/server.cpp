@@ -42,7 +42,8 @@ static void handle_signal(int)
 class ThreadPool
 {
 public:
-    explicit ThreadPool(size_t threads) : stop(false)
+    explicit ThreadPool(size_t threads)
+        : stop(false)
     {
         for (size_t i = 0; i < threads; ++i)
         {
@@ -66,7 +67,7 @@ public:
         }
     }
 
-    template<class F>
+    template <class F>
     void enqueue(F &&f)
     {
         {
@@ -150,9 +151,8 @@ static bool parse_pixels(const std::string &body, Tensor &image, const CNN &cnn)
             scalar_t raw = static_cast<scalar_t>(pixels[i]) / NORMALIZE_DIVISOR;
             size_t row = i / IMG_HEIGHT;
             size_t col = i % IMG_HEIGHT;
-            image(row * IMG_HEIGHT + col, 0) = cnn.normalize()
-                ? (raw - cnn.mean()) / cnn.std()
-                : raw;
+            image(row * IMG_HEIGHT + col, 0) =
+                cnn.normalize() ? (raw - cnn.mean()) / cnn.std() : raw;
         }
         return true;
     }
@@ -162,7 +162,8 @@ static bool parse_pixels(const std::string &body, Tensor &image, const CNN &cnn)
     }
 }
 
-static void handle_predict(int client_fd, const CNN &cnn, const std::string &body)
+static void handle_predict(int client_fd, const CNN &cnn,
+                           const std::string &body)
 {
     Tensor image(Shape({ PIXELS, 1 }), 0.0f);
     if (!parse_pixels(body, image, cnn))
@@ -189,8 +190,8 @@ static void handle_predict(int client_fd, const CNN &cnn, const std::string &bod
     response << "{\"prediction\":" << prediction << ",\"probabilities\":[";
     for (size_t i = 0; i < probabilities.size(); i++)
     {
-        response << (i == 0 ? "" : ",") << std::fixed
-                 << std::setprecision(10) << probabilities[i];
+        response << (i == 0 ? "" : ",") << std::fixed << std::setprecision(10)
+                 << probabilities[i];
     }
     response << "]}\n";
 
@@ -230,7 +231,8 @@ static void handle_client(int client_fd, const CNN &cnn)
         if (page)
             send_response(client_fd, "200 OK", "text/html", *page);
         else
-            send_response(client_fd, "404 Not Found", "text/plain", "not found");
+            send_response(client_fd, "404 Not Found", "text/plain",
+                          "not found");
     }
     else if (method == "POST" && path == "/predict")
     {
@@ -295,7 +297,7 @@ int main(int argc, char **argv)
     ThreadPool pool(THREAD_POOL_SIZE);
 
     std::cout << "MNIST server running on port " << port
-             << " (epoll + thread pool)\n";
+              << " (epoll + thread pool)\n";
 
     while (keep_running)
     {
@@ -311,8 +313,9 @@ int main(int argc, char **argv)
                 {
                     struct sockaddr_in client_addr;
                     socklen_t client_len = sizeof(client_addr);
-                    int client_fd = accept(
-                        server_fd, (struct sockaddr *)&client_addr, &client_len);
+                    int client_fd =
+                        accept(server_fd, (struct sockaddr *)&client_addr,
+                               &client_len);
                     if (client_fd == -1)
                         break;
 
@@ -325,9 +328,8 @@ int main(int argc, char **argv)
             else
             {
                 int client_fd = events[i].data.fd;
-                pool.enqueue([client_fd, &cnn]() {
-                    handle_client(client_fd, cnn);
-                });
+                pool.enqueue(
+                    [client_fd, &cnn]() { handle_client(client_fd, cnn); });
             }
         }
     }

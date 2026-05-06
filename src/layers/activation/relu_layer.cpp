@@ -6,8 +6,8 @@ ReluLayer::ReluLayer()
 {}
 
 const Tensor &ReluLayer::forward(const Tensor &input,
-                                    std::unique_ptr<LayerContext> &ctx,
-                                    bool is_training) const
+                                 std::unique_ptr<LayerContext> &ctx,
+                                 bool is_training) const
 {
     if (!ctx)
     {

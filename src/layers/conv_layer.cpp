@@ -25,8 +25,8 @@ ConvLayer::ConvLayer(size_t input_h, size_t input_w, size_t input_c,
 }
 
 const Tensor &ConvLayer::forward(const Tensor &input,
-                                  std::unique_ptr<LayerContext> &ctx,
-                                  bool is_training) const
+                                 std::unique_ptr<LayerContext> &ctx,
+                                 bool is_training) const
 {
     if (!ctx)
     {
@@ -65,9 +65,10 @@ const Tensor &ConvLayer::forward(const Tensor &input,
                     {
                         for (size_t x = 0; x < out_w_; ++x)
                         {
-                            size_t col_idx = b * (out_h_ * out_w_) + y * out_w_ + x;
-                            conv_ctx->col_buffer(row_idx, col_idx)
-                                = input(b, c, y + ky, x + kx);
+                            size_t col_idx =
+                                b * (out_h_ * out_w_) + y * out_w_ + x;
+                            conv_ctx->col_buffer(row_idx, col_idx) =
+                                input(b, c, y + ky, x + kx);
                         }
                     }
                 }
@@ -87,8 +88,8 @@ const Tensor &ConvLayer::forward(const Tensor &input,
                 size_t y = i / out_w_;
                 size_t x = i % out_w_;
                 size_t col_idx = b * (out_h_ * out_w_) + i;
-                conv_ctx->output(b, f, y, x)
-                    = conv_ctx->gemm_out(f, col_idx) + biases_(f, 0);
+                conv_ctx->output(b, f, y, x) =
+                    conv_ctx->gemm_out(f, col_idx) + biases_(f, 0);
             }
         }
     }
@@ -98,10 +99,11 @@ const Tensor &ConvLayer::forward(const Tensor &input,
 }
 
 const Tensor &ConvLayer::backward(const Tensor &gradient,
-                                   std::unique_ptr<LayerContext> &ctx,
-                                   bool is_training)
+                                  std::unique_ptr<LayerContext> &ctx,
+                                  bool is_training)
 {
-    assert(is_training && "Backward doit uniquement etre appele durant l'entrainement !");
+    assert(is_training
+           && "Backward doit uniquement etre appele durant l'entrainement !");
     auto *conv_ctx = static_cast<ConvContext *>(ctx.get());
 
     size_t batch_size = gradient.shape()[0];
@@ -109,7 +111,8 @@ const Tensor &ConvLayer::backward(const Tensor &gradient,
     if (conv_ctx->grad_input.shape().rank() == 0
         || conv_ctx->grad_input.shape()[0] != batch_size)
     {
-        conv_ctx->grad_input.reshape(Shape({batch_size, in_c_, in_h_, in_w_}));
+        conv_ctx->grad_input.reshape(
+            Shape({ batch_size, in_c_, in_h_, in_w_ }));
     }
     conv_ctx->grad_input.fill(0.0f);
 
@@ -175,9 +178,10 @@ const Tensor &ConvLayer::backward(const Tensor &gradient,
                     {
                         for (size_t x = 0; x < out_w_; ++x)
                         {
-                            size_t col_idx = b * (out_h_ * out_w_) + y * out_w_ + x;
-                            conv_ctx->grad_input(b, c, y + ky, x + kx)
-                                += conv_ctx->grad_col(row_idx, col_idx);
+                            size_t col_idx =
+                                b * (out_h_ * out_w_) + y * out_w_ + x;
+                            conv_ctx->grad_input(b, c, y + ky, x + kx) +=
+                                conv_ctx->grad_col(row_idx, col_idx);
                         }
                     }
                 }
@@ -190,8 +194,10 @@ const Tensor &ConvLayer::backward(const Tensor &gradient,
 
 void ConvLayer::clear_gradients()
 {
-    if (filters_grad_.size() > 0) filters_grad_.fill(0.0f);
-    if (biases_grad_.size() > 0) biases_grad_.fill(0.0f);
+    if (filters_grad_.size() > 0)
+        filters_grad_.fill(0.0f);
+    if (biases_grad_.size() > 0)
+        biases_grad_.fill(0.0f);
 }
 
 Shape3D ConvLayer::get_output_shape(const Shape3D &input_shape) const

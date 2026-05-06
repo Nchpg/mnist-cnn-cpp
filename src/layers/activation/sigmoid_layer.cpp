@@ -6,8 +6,8 @@ SigmoidLayer::SigmoidLayer()
 {}
 
 const Tensor &SigmoidLayer::forward(const Tensor &input,
-                                       std::unique_ptr<LayerContext> &ctx,
-                                       bool is_training) const
+                                    std::unique_ptr<LayerContext> &ctx,
+                                    bool is_training) const
 {
     if (!ctx)
     {
@@ -23,13 +23,13 @@ const Tensor &SigmoidLayer::forward(const Tensor &input,
 }
 
 const Tensor &SigmoidLayer::backward(const Tensor &gradient,
-                                       std::unique_ptr<LayerContext> &ctx,
-                                       bool is_training)
+                                     std::unique_ptr<LayerContext> &ctx,
+                                     bool is_training)
 {
     auto *sigmoid_ctx = static_cast<SigmoidContext *>(ctx.get());
     sigmoid_ctx->grad_input.reshape(gradient.shape());
     Activation::sigmoid_backward(sigmoid_ctx->output, gradient,
-                                sigmoid_ctx->grad_input);
+                                 sigmoid_ctx->grad_input);
     (void)is_training;
     return sigmoid_ctx->grad_input;
 }

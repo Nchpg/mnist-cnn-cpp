@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstring>
 #include <initializer_list>
@@ -27,40 +28,57 @@ struct Shape3D
     }
 };
 
+static constexpr size_t MAX_DIMS = 4;
+
 class Shape
 {
 private:
-    std::vector<size_t> dims_;
+    std::array<size_t, MAX_DIMS> dims_;
+    size_t rank_;
 
 public:
     Shape()
-        : dims_()
-    {}
-    Shape(std::vector<size_t> dims)
-        : dims_(std::move(dims))
-    {}
+        : rank_(0)
+    {
+        dims_.fill(0);
+    }
     Shape(std::initializer_list<size_t> dims)
-        : dims_(dims)
-    {}
+        : rank_(dims.size())
+    {
+        size_t i = 0;
+        for (size_t d : dims)
+            dims_[i++] = d;
+    }
+    Shape(const std::vector<size_t> &dims)
+        : rank_(dims.size())
+    {
+        for (size_t i = 0; i < rank_; ++i)
+            dims_[i] = dims[i];
+    }
 
     bool operator==(const Shape &other) const
     {
-        return dims_ == other.dims_;
+        if (rank_ != other.rank_)
+            return false;
+        for (size_t i = 0; i < rank_; ++i)
+            if (dims_[i] != other.dims_[i])
+                return false;
+        return true;
     }
     bool operator!=(const Shape &other) const
     {
-        return dims_ != other.dims_;
+        return !(*this == other);
     }
 
     size_t rank() const
     {
-        return dims_.size();
+        return rank_;
     }
     size_t size() const
     {
         size_t s = 1;
-        for (size_t d : dims_)
-            s *= d;
+        for (size_t i = 0; i < rank_; ++i)
+            s *= dims_[i];
         return s;
     }
 
@@ -73,7 +91,7 @@ public:
         return dims_.at(i);
     }
 
-    const std::vector<size_t> &dims() const
+    const std::array<size_t, MAX_DIMS> &dims() const
     {
         return dims_;
     }

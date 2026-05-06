@@ -13,8 +13,8 @@ BatchNormLayer::BatchNormLayer(size_t channels, size_t spatial_size)
 }
 
 const Tensor &BatchNormLayer::forward(const Tensor &input,
-                                       std::unique_ptr<LayerContext> &ctx,
-                                       bool is_training) const
+                                      std::unique_ptr<LayerContext> &ctx,
+                                      bool is_training) const
 {
     if (!ctx)
     {
@@ -61,7 +61,8 @@ const Tensor &BatchNormLayer::forward(const Tensor &input,
                 {
                     for (size_t x = 0; x < width; ++x)
                     {
-                        scalar_t diff = input(b, c, y, x) - bn_ctx->saved_mean(c, 0);
+                        scalar_t diff =
+                            input(b, c, y, x) - bn_ctx->saved_mean(c, 0);
                         var_sum += diff * diff;
                     }
                 }
@@ -122,10 +123,11 @@ const Tensor &BatchNormLayer::forward(const Tensor &input,
 }
 
 const Tensor &BatchNormLayer::backward(const Tensor &gradient,
-                                         std::unique_ptr<LayerContext> &ctx,
-                                         bool is_training)
+                                       std::unique_ptr<LayerContext> &ctx,
+                                       bool is_training)
 {
-    assert(is_training && "Backward doit uniquement etre appele durant l'entrainement !");
+    assert(is_training
+           && "Backward doit uniquement etre appele durant l'entrainement !");
     auto *bn_ctx = static_cast<BatchNormContext *>(ctx.get());
 
     size_t batch_size = gradient.shape()[0];
@@ -193,8 +195,10 @@ const Tensor &BatchNormLayer::backward(const Tensor &gradient,
 
 void BatchNormLayer::clear_gradients()
 {
-    if (grad_gamma_.size() > 0) grad_gamma_.fill(0.0f);
-    if (grad_beta_.size() > 0) grad_beta_.fill(0.0f);
+    if (grad_gamma_.size() > 0)
+        grad_gamma_.fill(0.0f);
+    if (grad_beta_.size() > 0)
+        grad_beta_.fill(0.0f);
 }
 
 void BatchNormLayer::save(std::ostream &os) const

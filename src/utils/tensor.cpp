@@ -1,6 +1,7 @@
 #include "utils/tensor.hpp"
 
 #include <algorithm>
+#include <cassert>
 #include <cstring>
 
 void Tensor::compute_strides()
@@ -104,6 +105,9 @@ void Tensor::add_scaled(const Tensor &other, scalar_t scale)
 void Tensor::matmul(const Tensor &A, const Tensor &B, Tensor &C, bool transA,
                     bool transB)
 {
+    assert(A.rank() == 2 && "Matmul: A must be 2D");
+    assert(B.rank() == 2 && "Matmul: B must be 2D");
+
     size_t M = transA ? A.shape()[1] : A.shape()[0];
     size_t K_A = transA ? A.shape()[0] : A.shape()[1];
     size_t K_B = transB ? B.shape()[1] : B.shape()[0];

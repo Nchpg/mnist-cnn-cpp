@@ -7,8 +7,8 @@ FlattenLayer::FlattenLayer(size_t channels, size_t height, size_t width)
 {}
 
 const Tensor &FlattenLayer::forward(const Tensor &input,
-                                       std::unique_ptr<LayerContext> &ctx,
-                                       bool is_training) const
+                                    std::unique_ptr<LayerContext> &ctx,
+                                    bool is_training) const
 {
     if (!ctx)
     {
@@ -28,8 +28,8 @@ const Tensor &FlattenLayer::forward(const Tensor &input,
 }
 
 const Tensor &FlattenLayer::backward(const Tensor &gradient,
-                                      std::unique_ptr<LayerContext> &ctx,
-                                      bool is_training)
+                                     std::unique_ptr<LayerContext> &ctx,
+                                     bool is_training)
 {
     auto *flatten_ctx = static_cast<FlattenContext *>(ctx.get());
     size_t batch_size = gradient.shape()[0];

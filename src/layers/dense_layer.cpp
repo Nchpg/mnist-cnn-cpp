@@ -57,17 +57,18 @@ const Tensor &DenseLayer::forward(const Tensor &input,
 }
 
 const Tensor &DenseLayer::backward(const Tensor &gradient,
-                                    std::unique_ptr<LayerContext> &ctx,
-                                    bool is_training)
+                                   std::unique_ptr<LayerContext> &ctx,
+                                   bool is_training)
 {
-    assert(is_training && "Backward doit uniquement etre appele durant l'entrainement !");
+    assert(is_training
+           && "Backward doit uniquement etre appele durant l'entrainement !");
     auto *dense_ctx = static_cast<DenseContext *>(ctx.get());
     size_t batch_size = gradient.shape()[0];
 
     if (dense_ctx->grad_input.size() == 0
         || dense_ctx->grad_input.shape()[0] != batch_size)
     {
-        dense_ctx->grad_input.reshape(Shape({batch_size, input_size_}));
+        dense_ctx->grad_input.reshape(Shape({ batch_size, input_size_ }));
     }
 
     Tensor::matmul(gradient, weights_, dense_ctx->grad_input, false, false);
@@ -95,8 +96,10 @@ const Tensor &DenseLayer::backward(const Tensor &gradient,
 
 void DenseLayer::clear_gradients()
 {
-    if (weights_grad_.size() > 0) weights_grad_.fill(0.0f);
-    if (biases_grad_.size() > 0) biases_grad_.fill(0.0f);
+    if (weights_grad_.size() > 0)
+        weights_grad_.fill(0.0f);
+    if (biases_grad_.size() > 0)
+        biases_grad_.fill(0.0f);
 }
 
 void DenseLayer::save(std::ostream &os) const
