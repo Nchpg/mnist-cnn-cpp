@@ -5,6 +5,13 @@
 
 #include "layers/layer.hpp"
 
+struct DenseContext : public LayerContext
+{
+    Tensor input;
+    Tensor activations;
+    Tensor grad_input;
+};
+
 class DenseLayer : public Layer
 {
 private:
@@ -13,29 +20,25 @@ private:
 
     Tensor weights_;
     Tensor biases_;
-    Tensor activations_;
 
-    const Tensor *input_ptr_ = nullptr;
     Tensor weights_grad_;
     Tensor biases_grad_;
-    Tensor grad_input_;
 
 public:
     DenseLayer(size_t input_size, size_t output_size, std::mt19937 &gen);
     ~DenseLayer() override = default;
 
-    const Tensor &forward(const Tensor &input) override;
-    const Tensor &backward(const Tensor &gradient) override;
+    const Tensor &forward(const Tensor &input,
+                          std::unique_ptr<LayerContext> &ctx,
+                          bool is_training) const override;
+    const Tensor &backward(const Tensor &gradient,
+                           std::unique_ptr<LayerContext> &ctx,
+                           bool is_training) override;
 
     void clear_gradients() override;
 
     void save(std::ostream &os) const override;
     void load(std::istream &is) override;
-
-    const Tensor &activations() const
-    {
-        return activations_;
-    }
 
     std::vector<Tensor *> get_weights() override
     {

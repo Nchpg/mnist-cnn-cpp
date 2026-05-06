@@ -1,5 +1,6 @@
 #include "layers/pooling_layer.hpp"
 
+#include <cassert>
 #include <limits>
 
 PoolingLayer::PoolingLayer(size_t input_h, size_t input_w, size_t input_c,
@@ -14,16 +15,26 @@ PoolingLayer::PoolingLayer(size_t input_h, size_t input_w, size_t input_c,
     out_w_ = (input_w - pool_size) / stride + 1;
 }
 
-const Tensor &PoolingLayer::forward(const Tensor &input)
+const Tensor &PoolingLayer::forward(const Tensor &input,
+                                     std::unique_ptr<LayerContext> &ctx,
+                                     bool is_training) const
 {
-    size_t batch_size = input.shape()[0];
-    input_ptr_ = &input;
-
-    if (output_.shape().rank() == 0 || output_.shape()[0] != batch_size)
+    if (!ctx)
     {
-        output_.reshape(Shape({ batch_size, in_c_, out_h_, out_w_ }));
-        grad_input_.reshape(input.shape());
-        argmax_indices_.resize(output_.size());
+        ctx = std::make_unique<PoolingContext>();
+    }
+    auto *pool_ctx = static_cast<PoolingContext *>(ctx.get());
+
+    size_t batch_size = input.shape()[0];
+
+    if (pool_ctx->output.shape().rank() == 0
+        || pool_ctx->output.shape()[0] != batch_size)
+    {
+        pool_ctx->output.reshape(Shape({ batch_size, in_c_, out_h_, out_w_ }));
+        if (is_training)
+        {
+            pool_ctx->argmax_indices.resize(pool_ctx->output.size());
+        }
     }
 
 #pragma omp parallel for collapse(2)
@@ -57,22 +68,36 @@ const Tensor &PoolingLayer::forward(const Tensor &input)
                             }
                         }
                     }
-                    output_(b, c, i, j) = max_val;
-                    size_t out_idx =
-                        ((b * in_c_ + c) * out_h_ + i) * out_w_ + j;
-                    argmax_indices_[out_idx] = max_idx;
+                    pool_ctx->output(b, c, i, j) = max_val;
+                    if (is_training)
+                    {
+                        size_t out_idx =
+                            ((b * in_c_ + c) * out_h_ + i) * out_w_ + j;
+                        pool_ctx->argmax_indices[out_idx] = max_idx;
+                    }
                 }
             }
         }
     }
 
-    return output_;
+    (void)is_training;
+    return pool_ctx->output;
 }
 
-const Tensor &PoolingLayer::backward(const Tensor &gradient)
+const Tensor &PoolingLayer::backward(const Tensor &gradient,
+                                      std::unique_ptr<LayerContext> &ctx,
+                                      bool is_training)
 {
-    grad_input_.fill(0.0f);
+    assert(is_training && "Backward doit uniquement etre appele durant l'entrainement !");
+    auto *pool_ctx = static_cast<PoolingContext *>(ctx.get());
+
     size_t batch_size = gradient.shape()[0];
+    if (pool_ctx->grad_input.shape().rank() == 0
+        || pool_ctx->grad_input.shape()[0] != batch_size)
+    {
+        pool_ctx->grad_input.reshape(Shape({batch_size, in_c_, in_h_, in_w_}));
+    }
+    pool_ctx->grad_input.fill(0.0f);
 
 #pragma omp parallel for collapse(2)
     for (size_t b = 0; b < batch_size; ++b)
@@ -85,17 +110,18 @@ const Tensor &PoolingLayer::backward(const Tensor &gradient)
                 {
                     size_t out_idx =
                         ((b * in_c_ + c) * out_h_ + i) * out_w_ + j;
-                    size_t max_in_idx = argmax_indices_[out_idx];
+                    size_t max_in_idx = pool_ctx->argmax_indices[out_idx];
                     size_t in_r = max_in_idx / in_w_;
                     size_t in_c = max_in_idx % in_w_;
 
-                    grad_input_(b, c, in_r, in_c) += gradient(b, c, i, j);
+                    pool_ctx->grad_input(b, c, in_r, in_c)
+                        += gradient(b, c, i, j);
                 }
             }
         }
     }
 
-    return grad_input_;
+    return pool_ctx->grad_input;
 }
 
 void PoolingLayer::save(std::ostream &os) const

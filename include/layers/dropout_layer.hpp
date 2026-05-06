@@ -5,23 +5,29 @@
 
 #include "layers/layer.hpp"
 
+struct DropoutContext : public LayerContext
+{
+    Tensor mask;
+    Tensor output;
+    Tensor grad_input;
+};
+
 class DropoutLayer : public Layer
 {
 private:
     scalar_t ratio_;
     std::mt19937 &local_gen_;
 
-    Tensor mask_;
-    Tensor output_;
-    Tensor grad_input_;
-    bool is_training_ = true;
-
 public:
     DropoutLayer(scalar_t ratio, std::mt19937 &gen);
     ~DropoutLayer() override = default;
 
-    const Tensor &forward(const Tensor &input) override;
-    const Tensor &backward(const Tensor &gradient) override;
+    const Tensor &forward(const Tensor &input,
+                          std::unique_ptr<LayerContext> &ctx,
+                          bool is_training) const override;
+    const Tensor &backward(const Tensor &gradient,
+                           std::unique_ptr<LayerContext> &ctx,
+                           bool is_training) override;
 
     void save(std::ostream &os) const override;
     void load(std::istream &is) override;

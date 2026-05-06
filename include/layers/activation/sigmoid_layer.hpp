@@ -2,21 +2,27 @@
 
 #include "layers/layer.hpp"
 
+struct SigmoidContext : public LayerContext
+{
+    Tensor output;
+    Tensor grad_input;
+};
+
 class SigmoidLayer : public Layer
 {
 public:
     static constexpr const char *LAYER_MARKER = "SIGM";
 
-private:
-    Tensor output_;
-    Tensor grad_input_;
-
 public:
     SigmoidLayer();
     ~SigmoidLayer() override = default;
 
-    const Tensor &forward(const Tensor &input) override;
-    const Tensor &backward(const Tensor &gradient) override;
+    const Tensor &forward(const Tensor &input,
+                          std::unique_ptr<LayerContext> &ctx,
+                          bool is_training) const override;
+    const Tensor &backward(const Tensor &gradient,
+                           std::unique_ptr<LayerContext> &ctx,
+                           bool is_training) override;
 
     void save(std::ostream &os) const override;
     void load(std::istream &is) override;

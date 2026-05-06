@@ -5,17 +5,32 @@
 ReluLayer::ReluLayer()
 {}
 
-const Tensor &ReluLayer::forward(const Tensor &input)
+const Tensor &ReluLayer::forward(const Tensor &input,
+                                    std::unique_ptr<LayerContext> &ctx,
+                                    bool is_training) const
 {
-    input_ptr_ = &input;
-    Activation::relu(input, output_);
-    return output_;
+    if (!ctx)
+    {
+        ctx = std::make_unique<ReluContext>();
+    }
+    auto *relu_ctx = static_cast<ReluContext *>(ctx.get());
+
+    relu_ctx->output.reshape(input.shape());
+    Activation::relu(input, relu_ctx->output);
+
+    (void)is_training;
+    return relu_ctx->output;
 }
 
-const Tensor &ReluLayer::backward(const Tensor &gradient)
+const Tensor &ReluLayer::backward(const Tensor &gradient,
+                                  std::unique_ptr<LayerContext> &ctx,
+                                  bool is_training)
 {
-    Activation::relu_backward(*input_ptr_, gradient, grad_input_);
-    return grad_input_;
+    auto *relu_ctx = static_cast<ReluContext *>(ctx.get());
+    relu_ctx->grad_input.reshape(gradient.shape());
+    Activation::relu_backward(relu_ctx->output, gradient, relu_ctx->grad_input);
+    (void)is_training;
+    return relu_ctx->grad_input;
 }
 
 void ReluLayer::save(std::ostream &os) const

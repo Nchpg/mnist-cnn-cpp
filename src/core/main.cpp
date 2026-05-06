@@ -227,7 +227,17 @@ int main(int argc, char **argv)
         Tensor image = dataset.image(index);
 
         std::vector<scalar_t> probabilities = cnn.predict(image);
-        int prediction = cnn.predict_label(image);
+
+        int prediction = 0;
+        scalar_t max_prob = probabilities[0];
+        for (size_t i = 1; i < probabilities.size(); i++)
+        {
+            if (probabilities[i] > max_prob)
+            {
+                max_prob = probabilities[i];
+                prediction = static_cast<int>(i);
+            }
+        }
 
         std::cout << "prediction: " << prediction << "\n";
         for (size_t digit = 0; digit < probabilities.size(); digit++)

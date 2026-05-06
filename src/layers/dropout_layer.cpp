@@ -1,28 +1,38 @@
 #include "layers/dropout_layer.hpp"
 
+#include <cassert>
+
 DropoutLayer::DropoutLayer(scalar_t ratio, std::mt19937 &gen)
     : ratio_(ratio)
     , local_gen_(gen)
 {}
 
-const Tensor &DropoutLayer::forward(const Tensor &input)
+const Tensor &DropoutLayer::forward(const Tensor &input,
+                                       std::unique_ptr<LayerContext> &ctx,
+                                       bool is_training) const
 {
-    if (!is_training_)
+    if (!ctx)
+    {
+        ctx = std::make_unique<DropoutContext>();
+    }
+    auto *dropout_ctx = static_cast<DropoutContext *>(ctx.get());
+
+    if (!is_training)
     {
         return input;
     }
 
-    if (output_.shape() != input.shape())
+    if (dropout_ctx->output.shape() != input.shape())
     {
-        mask_.reshape(input.shape());
-        output_.reshape(input.shape());
+        dropout_ctx->mask.reshape(input.shape());
+        dropout_ctx->output.reshape(input.shape());
     }
 
     scalar_t scale = 1.0f / (1.0f - ratio_);
     size_t n = input.size();
     const scalar_t *in_ptr = input.data_ptr();
-    scalar_t *mask_ptr = mask_.data_ptr();
-    scalar_t *out_ptr = output_.data_ptr();
+    scalar_t *mask_ptr = dropout_ctx->mask.data_ptr();
+    scalar_t *out_ptr = dropout_ctx->output.data_ptr();
 
     static thread_local std::mt19937 gen(local_gen_());
     std::uniform_real_distribution<scalar_t> dist(0.0f, 1.0f);
@@ -41,25 +51,25 @@ const Tensor &DropoutLayer::forward(const Tensor &input)
         out_ptr[i] = in_ptr[i] * mask_ptr[i];
     }
 
-    return output_;
+    return dropout_ctx->output;
 }
 
-const Tensor &DropoutLayer::backward(const Tensor &gradient)
+const Tensor &DropoutLayer::backward(const Tensor &gradient,
+                                      std::unique_ptr<LayerContext> &ctx,
+                                      bool is_training)
 {
-    if (!is_training_)
-    {
-        return gradient;
-    }
+    assert(is_training && "Backward doit uniquement etre appele durant l'entrainement !");
+    auto *dropout_ctx = static_cast<DropoutContext *>(ctx.get());
 
-    if (grad_input_.shape() != gradient.shape())
+    if (dropout_ctx->grad_input.shape() != gradient.shape())
     {
-        grad_input_.reshape(gradient.shape());
+        dropout_ctx->grad_input.reshape(gradient.shape());
     }
 
     size_t n = gradient.size();
     const scalar_t *grad_ptr = gradient.data_ptr();
-    const scalar_t *mask_ptr = mask_.data_ptr();
-    scalar_t *in_grad_ptr = grad_input_.data_ptr();
+    const scalar_t *mask_ptr = dropout_ctx->mask.data_ptr();
+    scalar_t *in_grad_ptr = dropout_ctx->grad_input.data_ptr();
 
 #pragma omp parallel for if (n > 10000)
     for (size_t i = 0; i < n; ++i)
@@ -67,7 +77,7 @@ const Tensor &DropoutLayer::backward(const Tensor &gradient)
         in_grad_ptr[i] = grad_ptr[i] * mask_ptr[i];
     }
 
-    return grad_input_;
+    return dropout_ctx->grad_input;
 }
 
 void DropoutLayer::save(std::ostream &os) const

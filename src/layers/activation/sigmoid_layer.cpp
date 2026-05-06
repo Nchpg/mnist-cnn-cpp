@@ -5,16 +5,33 @@
 SigmoidLayer::SigmoidLayer()
 {}
 
-const Tensor &SigmoidLayer::forward(const Tensor &input)
+const Tensor &SigmoidLayer::forward(const Tensor &input,
+                                       std::unique_ptr<LayerContext> &ctx,
+                                       bool is_training) const
 {
-    Activation::sigmoid(input, output_);
-    return output_;
+    if (!ctx)
+    {
+        ctx = std::make_unique<SigmoidContext>();
+    }
+    auto *sigmoid_ctx = static_cast<SigmoidContext *>(ctx.get());
+
+    sigmoid_ctx->output.reshape(input.shape());
+    Activation::sigmoid(input, sigmoid_ctx->output);
+
+    (void)is_training;
+    return sigmoid_ctx->output;
 }
 
-const Tensor &SigmoidLayer::backward(const Tensor &gradient)
+const Tensor &SigmoidLayer::backward(const Tensor &gradient,
+                                       std::unique_ptr<LayerContext> &ctx,
+                                       bool is_training)
 {
-    Activation::sigmoid_backward(output_, gradient, grad_input_);
-    return grad_input_;
+    auto *sigmoid_ctx = static_cast<SigmoidContext *>(ctx.get());
+    sigmoid_ctx->grad_input.reshape(gradient.shape());
+    Activation::sigmoid_backward(sigmoid_ctx->output, gradient,
+                                sigmoid_ctx->grad_input);
+    (void)is_training;
+    return sigmoid_ctx->grad_input;
 }
 
 void SigmoidLayer::save(std::ostream &os) const

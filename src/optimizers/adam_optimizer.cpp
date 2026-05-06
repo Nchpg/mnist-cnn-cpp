@@ -42,6 +42,8 @@ void AdamOptimizer::step()
     {
         if (!weights_[i] || !gradients_[i])
             continue;
+        if (weights_[i]->size() == 0 || gradients_[i]->size() == 0)
+            continue;
 
         size_t total = weights_[i]->size();
         scalar_t *w_ptr = weights_[i]->data().data();

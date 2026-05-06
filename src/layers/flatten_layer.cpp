@@ -6,24 +6,40 @@ FlattenLayer::FlattenLayer(size_t channels, size_t height, size_t width)
     , input_width_(width)
 {}
 
-const Tensor &FlattenLayer::forward(const Tensor &input)
+const Tensor &FlattenLayer::forward(const Tensor &input,
+                                       std::unique_ptr<LayerContext> &ctx,
+                                       bool is_training) const
 {
+    if (!ctx)
+    {
+        ctx = std::make_unique<FlattenContext>();
+    }
+    auto *flatten_ctx = static_cast<FlattenContext *>(ctx.get());
+
     size_t batch_size = input.shape()[0];
-    output_.reshape(
+    flatten_ctx->output.reshape(
         Shape({ batch_size, input_channels_ * input_height_ * input_width_ }));
 
-    std::copy(input.data().begin(), input.data().end(), output_.data().begin());
-    return output_;
+    std::copy(input.data().begin(), input.data().end(),
+              flatten_ctx->output.data().begin());
+
+    (void)is_training;
+    return flatten_ctx->output;
 }
 
-const Tensor &FlattenLayer::backward(const Tensor &gradient)
+const Tensor &FlattenLayer::backward(const Tensor &gradient,
+                                      std::unique_ptr<LayerContext> &ctx,
+                                      bool is_training)
 {
+    auto *flatten_ctx = static_cast<FlattenContext *>(ctx.get());
     size_t batch_size = gradient.shape()[0];
-    grad_input_.reshape(
+    flatten_ctx->grad_input.reshape(
         Shape({ batch_size, input_channels_, input_height_, input_width_ }));
 
-    std::copy(gradient.data().begin(), gradient.data().end(), grad_input_.data().begin());
-    return grad_input_;
+    std::copy(gradient.data().begin(), gradient.data().end(),
+              flatten_ctx->grad_input.data().begin());
+    (void)is_training;
+    return flatten_ctx->grad_input;
 }
 
 void FlattenLayer::save(std::ostream &os) const

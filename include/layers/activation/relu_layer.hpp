@@ -4,23 +4,28 @@
 
 #include "layers/layer.hpp"
 
+struct ReluContext : public LayerContext
+{
+    Tensor output;
+    Tensor grad_input;
+};
+
 class ReluLayer : public Layer
 {
 public:
     static constexpr const char *LAYER_MARKER = "RELU";
 
-private:
-    const Tensor *input_ptr_ = nullptr;
-    Tensor output_;
-    Tensor grad_input_;
-
 public:
     ReluLayer();
     ~ReluLayer() override = default;
 
-    const Tensor &forward(const Tensor &input) override;
+    const Tensor &forward(const Tensor &input,
+                         std::unique_ptr<LayerContext> &ctx,
+                         bool is_training) const override;
 
-    const Tensor &backward(const Tensor &gradient) override;
+    const Tensor &backward(const Tensor &gradient,
+                          std::unique_ptr<LayerContext> &ctx,
+                          bool is_training) override;
 
     void save(std::ostream &os) const override;
     void load(std::istream &is) override;

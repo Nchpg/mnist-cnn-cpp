@@ -163,27 +163,16 @@ void CNN::build_from_json(const nlohmann::json &config_data)
             model_.add(std::move(layer));
         }
     }
-
-    if (hp_.optimizer_type == OptimizerType::SGD)
-    {
-        model_.set_optimizer(std::make_unique<SGDOptimizer>(hp_.learning_rate));
-    }
-    else
-    {
-        model_.set_optimizer(std::make_unique<AdamOptimizer>(
-            hp_.learning_rate, hp_.beta1, hp_.beta2, hp_.epsilon));
-    }
 }
 
-std::vector<scalar_t> CNN::predict(const Tensor &image)
+std::vector<scalar_t> CNN::predict(const Tensor &image) const
 {
-    model_.set_training(false);
-
     Tensor img_batch = image;
     img_batch.reshape(Shape(
         { 1, input_shape_.channels, input_shape_.height, input_shape_.width }));
 
-    const Tensor &probs = model_.forward(img_batch);
+    thread_local std::vector<std::unique_ptr<LayerContext>> contexts;
+    const Tensor &probs = model_.forward(img_batch, contexts, false);
 
     std::vector<scalar_t> result(probs.shape()[1]);
     for (size_t i = 0; i < probs.shape()[1]; i++)
@@ -191,22 +180,25 @@ std::vector<scalar_t> CNN::predict(const Tensor &image)
     return result;
 }
 
-int CNN::predict_label(const Tensor &image)
+int CNN::predict_label(const Tensor &image) const
 {
-    model_.set_training(false);
-
     Tensor img_batch = image;
     img_batch.reshape(Shape(
         { 1, input_shape_.channels, input_shape_.height, input_shape_.width }));
 
-    const Tensor &probs = model_.forward(img_batch);
+    thread_local std::vector<std::unique_ptr<LayerContext>> contexts;
+    const Tensor &probs = model_.forward(img_batch, contexts, false);
     auto results = Utils::argmax(probs);
     return static_cast<int>(results[0]);
 }
 
 void CNN::train(Dataset &dataset, size_t epochs)
 {
-    model_.set_training(true);
+    if (!model_.optimizer())
+    {
+        set_hyperparameters(hp_);
+    }
+
     if (model_.optimizer())
     {
         model_.optimizer()->reset();
@@ -248,6 +240,8 @@ void CNN::train(Dataset &dataset, size_t epochs)
 
     size_t samples_to_process = (total_samples / batch_size) * batch_size;
 
+    std::vector<std::unique_ptr<LayerContext>> contexts;
+
     for (size_t epoch = 0; epoch < epochs; epoch++)
     {
         dataset.shuffle_indices();
@@ -264,7 +258,7 @@ void CNN::train(Dataset &dataset, size_t epochs)
                 Shape({ batch_size, input_shape_.channels, input_shape_.height,
                         input_shape_.width }));
 
-            const Tensor &output = model_.forward(batch_images);
+            const Tensor &output = model_.forward(batch_images, contexts, true);
 
             total_loss += loss_fn->forward(output, batch_labels)
                 * static_cast<scalar_t>(batch_size);
@@ -280,12 +274,12 @@ void CNN::train(Dataset &dataset, size_t epochs)
             {
                 loss_fn->backward_fused(last_layer_type, output, batch_labels,
                                         grad_output);
-                model_.backward_skip_last(grad_output);
+                model_.backward_skip_last(grad_output, contexts, true);
             }
             else
             {
                 loss_fn->backward(output, batch_labels, grad_output);
-                model_.backward(grad_output);
+                model_.backward(grad_output, contexts, true);
             }
 
             model_.step();
@@ -339,12 +333,12 @@ void CNN::train(Dataset &dataset, size_t epochs)
 
 scalar_t CNN::accuracy(const Dataset &dataset)
 {
-    model_.set_training(false);
     size_t correct = 0;
     const size_t eval_batch_size = 64;
 
     Tensor batch_images;
     std::vector<size_t> batch_labels;
+    std::vector<std::unique_ptr<LayerContext>> contexts;
 
     for (size_t i = 0; i < dataset.count(); i += eval_batch_size)
     {
@@ -357,7 +351,7 @@ scalar_t CNN::accuracy(const Dataset &dataset)
             Shape({ actual_batch_size, input_shape_.channels,
                     input_shape_.height, input_shape_.width }));
 
-        const Tensor &logits = model_.forward(batch_images);
+        const Tensor &logits = model_.forward(batch_images, contexts, false);
         auto predictions = Utils::argmax(logits);
 
         for (size_t b = 0; b < actual_batch_size; ++b)
@@ -409,11 +403,11 @@ void CNN::save(const std::string &path) const
     file.write(reinterpret_cast<const char *>(&header_len), sizeof(header_len));
     file.write(header_str.c_str(), header_len);
 
-    file.write(reinterpret_cast<const char *>(&MnistDataset::mean_),
+    file.write(reinterpret_cast<const char *>(&data_mean_),
                sizeof(scalar_t));
-    file.write(reinterpret_cast<const char *>(&MnistDataset::std_),
+    file.write(reinterpret_cast<const char *>(&data_std_),
                sizeof(scalar_t));
-    file.write(reinterpret_cast<const char *>(&MnistDataset::normalize_),
+    file.write(reinterpret_cast<const char *>(&normalize_input_),
                sizeof(bool));
 
     for (const auto &layer : model_.layers())
@@ -442,10 +436,10 @@ void CNN::load_from_model(const std::string &path)
     json header = json::parse(header_str);
     build_from_json(header);
 
-    file.read(reinterpret_cast<char *>(&MnistDataset::mean_), sizeof(scalar_t));
-    file.read(reinterpret_cast<char *>(&MnistDataset::std_), sizeof(scalar_t));
-    file.read(reinterpret_cast<char *>(&MnistDataset::normalize_),
-              sizeof(bool));
+    file.read(reinterpret_cast<char *>(&data_mean_), sizeof(scalar_t));
+    file.read(reinterpret_cast<char *>(&data_std_), sizeof(scalar_t));
+    file.read(reinterpret_cast<char *>(&normalize_input_),
+               sizeof(bool));
 
     for (auto &layer : model_.layers())
         layer->load(file);

@@ -1,5 +1,6 @@
 #include "layers/dense_layer.hpp"
 
+#include <cassert>
 #include <fstream>
 #include <stdexcept>
 
@@ -9,30 +10,39 @@ DenseLayer::DenseLayer(size_t input_size, size_t output_size, std::mt19937 &gen)
 {
     weights_.reshape(Shape({ output_size_, input_size_ }));
     biases_.reshape(Shape({ output_size_, 1 }));
-    weights_grad_.reshape(Shape({ output_size_, input_size_ }));
-    biases_grad_.reshape(Shape({ output_size_, 1 }));
 
     scalar_t std_dev = std::sqrt(2.0f / static_cast<scalar_t>(input_size));
     weights_.random_normal(std_dev, gen);
     biases_.fill(0.0f);
-    clear_gradients();
 }
 
-const Tensor &DenseLayer::forward(const Tensor &input)
+const Tensor &DenseLayer::forward(const Tensor &input,
+                                  std::unique_ptr<LayerContext> &ctx,
+                                  bool is_training) const
 {
-    size_t batch_size = input.shape()[0];
-    input_ptr_ = &input;
-
-    if (activations_.rank() != 2 || activations_.shape()[0] != batch_size
-        || activations_.shape()[1] != output_size_)
+    if (!ctx)
     {
-        activations_.reshape(Shape({ batch_size, output_size_ }));
-        grad_input_.reshape(Shape({ batch_size, input_size_ }));
+        ctx = std::make_unique<DenseContext>();
+    }
+    auto *dense_ctx = static_cast<DenseContext *>(ctx.get());
+
+    size_t batch_size = input.shape()[0];
+
+    if (is_training)
+    {
+        dense_ctx->input = input;
     }
 
-    Tensor::matmul(input, weights_, activations_, false, true);
+    if (dense_ctx->activations.rank() != 2
+        || dense_ctx->activations.shape()[0] != batch_size
+        || dense_ctx->activations.shape()[1] != output_size_)
+    {
+        dense_ctx->activations.reshape(Shape({ batch_size, output_size_ }));
+    }
 
-    scalar_t *act_ptr = activations_.data_ptr();
+    Tensor::matmul(input, weights_, dense_ctx->activations, false, true);
+
+    scalar_t *act_ptr = dense_ctx->activations.data_ptr();
     const scalar_t *bias_ptr = biases_.data_ptr();
 #pragma omp parallel for
     for (size_t b = 0; b < batch_size; ++b)
@@ -43,15 +53,31 @@ const Tensor &DenseLayer::forward(const Tensor &input)
         }
     }
 
-    return activations_;
+    return dense_ctx->activations;
 }
 
-const Tensor &DenseLayer::backward(const Tensor &gradient)
+const Tensor &DenseLayer::backward(const Tensor &gradient,
+                                    std::unique_ptr<LayerContext> &ctx,
+                                    bool is_training)
 {
+    assert(is_training && "Backward doit uniquement etre appele durant l'entrainement !");
+    auto *dense_ctx = static_cast<DenseContext *>(ctx.get());
     size_t batch_size = gradient.shape()[0];
 
-    Tensor::matmul(gradient, weights_, grad_input_, false, false);
-    Tensor::matmul(gradient, *input_ptr_, weights_grad_, true, false);
+    if (dense_ctx->grad_input.size() == 0
+        || dense_ctx->grad_input.shape()[0] != batch_size)
+    {
+        dense_ctx->grad_input.reshape(Shape({batch_size, input_size_}));
+    }
+
+    Tensor::matmul(gradient, weights_, dense_ctx->grad_input, false, false);
+
+    if (weights_grad_.size() == 0)
+    {
+        weights_grad_.reshape(weights_.shape());
+        biases_grad_.reshape(biases_.shape());
+    }
+    Tensor::matmul(gradient, dense_ctx->input, weights_grad_, true, false);
 
     biases_grad_.fill(0.0f);
     const scalar_t *grad_ptr = gradient.data_ptr();
@@ -64,13 +90,13 @@ const Tensor &DenseLayer::backward(const Tensor &gradient)
         }
     }
 
-    return grad_input_;
+    return dense_ctx->grad_input;
 }
 
 void DenseLayer::clear_gradients()
 {
-    weights_grad_.fill(0.0f);
-    biases_grad_.fill(0.0f);
+    if (weights_grad_.size() > 0) weights_grad_.fill(0.0f);
+    if (biases_grad_.size() > 0) biases_grad_.fill(0.0f);
 }
 
 void DenseLayer::save(std::ostream &os) const

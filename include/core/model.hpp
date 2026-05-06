@@ -1,5 +1,7 @@
 #pragma once
 
+#include <iostream>
+
 #include "layers/layer.hpp"
 #include "optimizers/optimizer.hpp"
 
@@ -36,41 +38,53 @@ public:
         return optimizer_.get();
     }
 
-    void set_training(bool training)
+    const Tensor &forward(
+        const Tensor &input,
+        std::vector<std::unique_ptr<LayerContext>> &contexts,
+        bool is_training) const
     {
-        for (auto &layer : layers_)
-        {
-            layer->set_training(training);
-        }
-    }
-
-    const Tensor &forward(const Tensor &input)
-    {
+        contexts.resize(layers_.size());
         const Tensor *x = &input;
-        for (auto &layer : layers_)
+        for (size_t i = 0; i < layers_.size(); ++i)
         {
-            x = &(layer->forward(*x));
+            x = &(layers_[i]->forward(*x, contexts[i], is_training));
         }
         return *x;
     }
 
-    void backward(const Tensor &gradient)
+    void backward(
+        const Tensor &gradient,
+        std::vector<std::unique_ptr<LayerContext>> &contexts,
+        bool is_training)
     {
-        const Tensor *grad = &gradient;
-        for (auto it = layers_.rbegin(); it != layers_.rend(); ++it)
+        if (contexts.size() != layers_.size())
         {
-            grad = &((*it)->backward(*grad));
+            throw std::runtime_error(
+                "Context size mismatch! You must call forward() before backward().");
+        }
+        const Tensor *current_grad = &gradient;
+        for (int i = layers_.size() - 1; i >= 0; --i)
+        {
+            current_grad = &(layers_[i]->backward(*current_grad, contexts[i], is_training));
         }
     }
 
-    void backward_skip_last(const Tensor &gradient)
+    void backward_skip_last(
+        const Tensor &gradient,
+        std::vector<std::unique_ptr<LayerContext>> &contexts,
+        bool is_training)
     {
         if (layers_.empty())
             return;
-        const Tensor *grad = &gradient;
-        for (auto it = layers_.rbegin() + 1; it != layers_.rend(); ++it)
+        if (contexts.size() != layers_.size())
         {
-            grad = &((*it)->backward(*grad));
+            throw std::runtime_error(
+                "Context size mismatch! You must call forward() before backward().");
+        }
+        const Tensor *current_grad = &gradient;
+        for (int i = layers_.size() - 1; i > 0; --i)
+        {
+            current_grad = &(layers_[i]->backward(*current_grad, contexts[i], is_training));
         }
     }
 

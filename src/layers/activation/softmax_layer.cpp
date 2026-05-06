@@ -8,16 +8,33 @@ SoftmaxLayer::SoftmaxLayer()
 SoftmaxLayer::~SoftmaxLayer()
 {}
 
-const Tensor &SoftmaxLayer::forward(const Tensor &input)
+const Tensor &SoftmaxLayer::forward(const Tensor &input,
+                                       std::unique_ptr<LayerContext> &ctx,
+                                       bool is_training) const
 {
-    Activation::softmax(input, output_);
-    return output_;
+    if (!ctx)
+    {
+        ctx = std::make_unique<SoftmaxContext>();
+    }
+    auto *softmax_ctx = static_cast<SoftmaxContext *>(ctx.get());
+
+    softmax_ctx->output.reshape(input.shape());
+    Activation::softmax(input, softmax_ctx->output);
+
+    (void)is_training;
+    return softmax_ctx->output;
 }
 
-const Tensor &SoftmaxLayer::backward(const Tensor &gradient)
+const Tensor &SoftmaxLayer::backward(const Tensor &gradient,
+                                      std::unique_ptr<LayerContext> &ctx,
+                                      bool is_training)
 {
-    Activation::softmax_backward(output_, gradient, grad_input_);
-    return grad_input_;
+    auto *softmax_ctx = static_cast<SoftmaxContext *>(ctx.get());
+    softmax_ctx->grad_input.reshape(gradient.shape());
+    Activation::softmax_backward(softmax_ctx->output, gradient,
+                                 softmax_ctx->grad_input);
+    (void)is_training;
+    return softmax_ctx->grad_input;
 }
 
 nlohmann::json SoftmaxLayer::get_config() const

@@ -1,5 +1,7 @@
 #include "layers/conv_layer.hpp"
 
+#include <cassert>
+#include <iostream>
 #include <omp.h>
 
 ConvLayer::ConvLayer(size_t input_h, size_t input_w, size_t input_c,
@@ -13,33 +15,41 @@ ConvLayer::ConvLayer(size_t input_h, size_t input_w, size_t input_c,
     out_h_ = input_h - kernel_size + 1;
     out_w_ = input_w - kernel_size + 1;
 
-    filters_.reshape(Shape({ out_c_, in_c_, k_size_, k_size_ }));
+    filters_.reshape(Shape({ out_c_, in_c_ * k_size_ * k_size_ }));
     biases_.reshape(Shape({ out_c_, 1 }));
 
     scalar_t std_dev = std::sqrt(
         2.0f / static_cast<scalar_t>(in_c_ * kernel_size * kernel_size));
     filters_.random_normal(std_dev, gen);
     biases_.fill(0.0f);
-
-    filters_grad_.reshape(filters_.shape());
-    biases_grad_.reshape(biases_.shape());
 }
 
-const Tensor &ConvLayer::forward(const Tensor &input)
+const Tensor &ConvLayer::forward(const Tensor &input,
+                                  std::unique_ptr<LayerContext> &ctx,
+                                  bool is_training) const
 {
-    size_t batch_size = input.shape()[0];
-    input_ptr_ = &input;
-
-    if (output_.shape().rank() == 0 || output_.shape()[0] != batch_size)
+    if (!ctx)
     {
-        output_.reshape(Shape({ batch_size, out_c_, out_h_, out_w_ }));
-        grad_input_.reshape(input.shape());
-        col_buffer_.reshape(
-            Shape({ in_c_ * k_size_ * k_size_, batch_size * out_h_ * out_w_ }));
-        gemm_out_.reshape(Shape({ out_c_, batch_size * out_h_ * out_w_ }));
+        ctx = std::make_unique<ConvContext>();
+    }
+    auto *conv_ctx = static_cast<ConvContext *>(ctx.get());
+
+    size_t batch_size = input.shape()[0];
+
+    if (conv_ctx->output.shape().rank() == 0
+        || conv_ctx->output.shape()[0] != batch_size)
+    {
+        conv_ctx->output.reshape(Shape({ batch_size, out_c_, out_h_, out_w_ }));
     }
 
-    filters_.reshape(Shape({ out_c_, in_c_ * k_size_ * k_size_ }));
+    if (conv_ctx->col_buffer.shape().rank() == 0
+        || conv_ctx->col_buffer.shape()[1] != batch_size * out_h_ * out_w_)
+    {
+        conv_ctx->col_buffer.reshape(
+            Shape({ in_c_ * k_size_ * k_size_, batch_size * out_h_ * out_w_ }));
+        conv_ctx->gemm_out.reshape(
+            Shape({ out_c_, batch_size * out_h_ * out_w_ }));
+    }
 
 #pragma omp parallel for collapse(2) if (batch_size * in_c_ > 4)
     for (size_t b = 0; b < batch_size; ++b)
@@ -56,7 +66,8 @@ const Tensor &ConvLayer::forward(const Tensor &input)
                         for (size_t x = 0; x < out_w_; ++x)
                         {
                             size_t col_idx = b * (out_h_ * out_w_) + y * out_w_ + x;
-                            col_buffer_(row_idx, col_idx) = input(b, c, y + ky, x + kx);
+                            conv_ctx->col_buffer(row_idx, col_idx)
+                                = input(b, c, y + ky, x + kx);
                         }
                     }
                 }
@@ -64,7 +75,7 @@ const Tensor &ConvLayer::forward(const Tensor &input)
         }
     }
 
-    Tensor::matmul(filters_, col_buffer_, gemm_out_);
+    Tensor::matmul(filters_, conv_ctx->col_buffer, conv_ctx->gemm_out);
 
 #pragma omp parallel for collapse(3) if (batch_size * out_c_ * out_h_ > 100)
     for (size_t b = 0; b < batch_size; ++b)
@@ -76,30 +87,44 @@ const Tensor &ConvLayer::forward(const Tensor &input)
                 size_t y = i / out_w_;
                 size_t x = i % out_w_;
                 size_t col_idx = b * (out_h_ * out_w_) + i;
-                output_(b, f, y, x) = gemm_out_(f, col_idx) + biases_(f, 0);
+                conv_ctx->output(b, f, y, x)
+                    = conv_ctx->gemm_out(f, col_idx) + biases_(f, 0);
             }
         }
     }
 
-    filters_.reshape(Shape({ out_c_, in_c_, k_size_, k_size_ }));
-
-    return output_;
+    (void)is_training;
+    return conv_ctx->output;
 }
 
-const Tensor &ConvLayer::backward(const Tensor &gradient)
+const Tensor &ConvLayer::backward(const Tensor &gradient,
+                                   std::unique_ptr<LayerContext> &ctx,
+                                   bool is_training)
 {
+    assert(is_training && "Backward doit uniquement etre appele durant l'entrainement !");
+    auto *conv_ctx = static_cast<ConvContext *>(ctx.get());
+
     size_t batch_size = gradient.shape()[0];
 
-    grad_input_.fill(0.0f);
-
-    filters_.reshape(Shape({ out_c_, in_c_ * k_size_ * k_size_ }));
-    filters_grad_.reshape(Shape({ out_c_, in_c_ * k_size_ * k_size_ }));
-
-    if (grad_view_.shape().rank() == 0
-        || grad_view_.shape()[1] != batch_size * out_h_ * out_w_)
+    if (conv_ctx->grad_input.shape().rank() == 0
+        || conv_ctx->grad_input.shape()[0] != batch_size)
     {
-        grad_view_.reshape(Shape({ out_c_, batch_size * out_h_ * out_w_ }));
-        grad_col_.reshape(
+        conv_ctx->grad_input.reshape(Shape({batch_size, in_c_, in_h_, in_w_}));
+    }
+    conv_ctx->grad_input.fill(0.0f);
+
+    if (filters_grad_.size() == 0)
+    {
+        filters_grad_.reshape(Shape({ out_c_, in_c_ * k_size_ * k_size_ }));
+        biases_grad_.reshape(biases_.shape());
+    }
+
+    if (conv_ctx->grad_view.shape().rank() == 0
+        || conv_ctx->grad_view.shape()[1] != batch_size * out_h_ * out_w_)
+    {
+        conv_ctx->grad_view.reshape(
+            Shape({ out_c_, batch_size * out_h_ * out_w_ }));
+        conv_ctx->grad_col.reshape(
             Shape({ in_c_ * k_size_ * k_size_, batch_size * out_h_ * out_w_ }));
     }
 
@@ -113,7 +138,7 @@ const Tensor &ConvLayer::backward(const Tensor &gradient)
                 for (size_t x = 0; x < out_w_; ++x)
                 {
                     size_t col_idx = b * (out_h_ * out_w_) + y * out_w_ + x;
-                    grad_view_(f, col_idx) = gradient(b, f, y, x);
+                    conv_ctx->grad_view(f, col_idx) = gradient(b, f, y, x);
                 }
             }
         }
@@ -125,14 +150,16 @@ const Tensor &ConvLayer::backward(const Tensor &gradient)
         scalar_t sum = 0.0f;
         for (size_t col = 0; col < batch_size * out_h_ * out_w_; ++col)
         {
-            sum += grad_view_(f, col);
+            sum += conv_ctx->grad_view(f, col);
         }
         biases_grad_(f, 0) = sum;
     }
 
-    Tensor::matmul(grad_view_, col_buffer_, filters_grad_, false, true);
+    Tensor::matmul(conv_ctx->grad_view, conv_ctx->col_buffer, filters_grad_,
+                   false, true);
 
-    Tensor::matmul(filters_, grad_view_, grad_col_, true, false);
+    Tensor::matmul(filters_, conv_ctx->grad_view, conv_ctx->grad_col, true,
+                   false);
 
 #pragma omp parallel for collapse(2)
     for (size_t b = 0; b < batch_size; ++b)
@@ -149,7 +176,8 @@ const Tensor &ConvLayer::backward(const Tensor &gradient)
                         for (size_t x = 0; x < out_w_; ++x)
                         {
                             size_t col_idx = b * (out_h_ * out_w_) + y * out_w_ + x;
-                            grad_input_(b, c, y + ky, x + kx) += grad_col_(row_idx, col_idx);
+                            conv_ctx->grad_input(b, c, y + ky, x + kx)
+                                += conv_ctx->grad_col(row_idx, col_idx);
                         }
                     }
                 }
@@ -157,16 +185,13 @@ const Tensor &ConvLayer::backward(const Tensor &gradient)
         }
     }
 
-    filters_.reshape(Shape({ out_c_, in_c_, k_size_, k_size_ }));
-    filters_grad_.reshape(Shape({ out_c_, in_c_, k_size_, k_size_ }));
-
-    return grad_input_;
+    return conv_ctx->grad_input;
 }
 
 void ConvLayer::clear_gradients()
 {
-    filters_grad_.fill(0.0f);
-    biases_grad_.fill(0.0f);
+    if (filters_grad_.size() > 0) filters_grad_.fill(0.0f);
+    if (biases_grad_.size() > 0) biases_grad_.fill(0.0f);
 }
 
 Shape3D ConvLayer::get_output_shape(const Shape3D &input_shape) const
@@ -216,6 +241,11 @@ void ConvLayer::load(std::istream &is)
 
     filters_.load(is);
     biases_.load(is);
+
+    if (filters_.shape().rank() == 4)
+    {
+        filters_.reshape(Shape({ out_c_, in_c_ * k_size_ * k_size_ }));
+    }
 }
 
 nlohmann::json ConvLayer::get_config() const

@@ -5,6 +5,16 @@
 
 #include "layers/layer.hpp"
 
+struct ConvContext : public LayerContext
+{
+    Tensor output;
+    Tensor grad_input;
+    Tensor col_buffer;
+    Tensor grad_view;
+    Tensor grad_col;
+    Tensor gemm_out;
+};
+
 class ConvLayer : public Layer
 {
 private:
@@ -19,23 +29,17 @@ private:
     Tensor filters_grad_;
     Tensor biases_grad_;
 
-    const Tensor *input_ptr_ = nullptr;
-    Tensor output_;
-    Tensor grad_input_;
-
-    Tensor col_buffer_;
-    Tensor grad_view_;
-    Tensor temp_filter_grad_;
-    Tensor grad_col_;
-    Tensor gemm_out_;
-
 public:
     ConvLayer(size_t input_h, size_t input_w, size_t input_c,
               size_t kernel_size, size_t filter_count, std::mt19937 &gen);
     ~ConvLayer() override = default;
 
-    const Tensor &forward(const Tensor &input) override;
-    const Tensor &backward(const Tensor &gradient) override;
+    const Tensor &forward(const Tensor &input,
+                          std::unique_ptr<LayerContext> &ctx,
+                          bool is_training) const override;
+    const Tensor &backward(const Tensor &gradient,
+                           std::unique_ptr<LayerContext> &ctx,
+                           bool is_training) override;
 
     void clear_gradients() override;
 

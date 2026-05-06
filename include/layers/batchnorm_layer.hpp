@@ -4,6 +4,14 @@
 
 #include "layers/layer.hpp"
 
+struct BatchNormContext : public LayerContext
+{
+    Tensor normalized;
+    Tensor grad_input;
+    Tensor saved_mean;
+    Tensor saved_var;
+};
+
 class BatchNormLayer : public Layer
 {
 private:
@@ -16,31 +24,21 @@ private:
     Tensor beta_;
     Tensor grad_gamma_;
     Tensor grad_beta_;
-    Tensor running_mean_;
-    Tensor running_var_;
-    Tensor saved_mean_;
-    Tensor saved_var_;
-
-    const Tensor *input_ptr_ = nullptr;
-    Tensor normalized_;
-    Tensor output_;
-    Tensor grad_input_;
-
-    bool is_training_ = true;
+    mutable Tensor running_mean_;
+    mutable Tensor running_var_;
 
 public:
     BatchNormLayer(size_t channels, size_t spatial_size);
     ~BatchNormLayer() override = default;
 
-    const Tensor &forward(const Tensor &input) override;
-    const Tensor &backward(const Tensor &gradient) override;
+    const Tensor &forward(const Tensor &input,
+                          std::unique_ptr<LayerContext> &ctx,
+                          bool is_training) const override;
+    const Tensor &backward(const Tensor &gradient,
+                           std::unique_ptr<LayerContext> &ctx,
+                           bool is_training) override;
 
     void clear_gradients() override;
-
-    void set_training(bool training)
-    {
-        is_training_ = training;
-    }
 
     std::vector<Tensor *> get_weights() override
     {

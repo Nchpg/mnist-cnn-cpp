@@ -2,10 +2,10 @@ CC := g++
 # Force NIX_ENFORCE_NO_NATIVE to be empty to allow -march=native
 NIX_ENFORCE_NO_NATIVE :=
 export NIX_ENFORCE_NO_NATIVE
-CFLAGS_COMMON := -std=c++17 -Wall -Wextra -Wpedantic -fopenmp -Iinclude -MMD -MP -O3 -march=native
+CFLAGS_COMMON := -std=c++17 -Wall -Wextra -Wpedantic -fopenmp -Iinclude -MMD -MP -O3 -march=native -flto
 CFLAGS_DEBUG := $(CFLAGS_COMMON) -g -Og -fsanitize=address -fsanitize=undefined
 CFLAGS := $(CFLAGS_COMMON)
-LDLIBS := -lm -fopenmp
+LDLIBS := -lm -fopenmp -flto
 
 MAKEFLAGS += -j$(shell nproc)
 
