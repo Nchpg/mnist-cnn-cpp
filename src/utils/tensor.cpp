@@ -66,6 +66,24 @@ void Tensor::fill(scalar_t value)
     std::fill(data_.begin(), data_.end(), value);
 }
 
+void Tensor::fill_random_mask(scalar_t ratio, scalar_t scale)
+{
+    size_t n = data_.size();
+    #pragma omp parallel if (n > 10000)
+    {
+        // each thread create a random generator (because not thread-safe)
+        thread_local std::mt19937 gen(std::random_device{}());
+        std::uniform_real_distribution<scalar_t> dist(0.0f, 1.0f);
+
+        // divide the work for each thread
+        #pragma omp for
+        for (size_t i = 0; i < n; ++i)
+        {
+            data_[i] = (dist(gen) > ratio) ? scale : 0.0f;
+        }
+    }
+}
+
 void Tensor::random_uniform(scalar_t scale, std::mt19937& gen)
 {
     std::uniform_real_distribution<scalar_t> dist(-scale, scale);
@@ -87,7 +105,7 @@ Tensor& Tensor::operator+=(const Tensor& other)
         throw std::invalid_argument("Shapes mismatch in operator+=");
     }
     size_t n = data_.size();
-#pragma omp parallel for if (n > 10000)
+    #pragma omp parallel for if (n > 10000)
     for (size_t i = 0; i < n; ++i)
         data_[i] += other.data_[i];
     return *this;
@@ -144,11 +162,8 @@ void Tensor::sum_rows(const Tensor& input, Tensor& output)
     size_t rows = input.shape()[0];
     size_t cols = input.shape()[1];
 
-    // Redimensionne la sortie si nécessaire (matrice colonne)
-    if (output.rank() != 2 || output.shape()[0] != rows || output.shape()[1] != 1)
-    {
-        output.reshape(Shape({rows, 1}));
-    }
+    output.reshape(Shape({rows, 1}));
+    output.fill(0.0f);
 
     const scalar_t* in_ptr = input.data_ptr();
     scalar_t* out_ptr = output.data_ptr();
@@ -162,6 +177,28 @@ void Tensor::sum_rows(const Tensor& input, Tensor& output)
             sum += in_ptr[r * cols + c];
         }
         out_ptr[r] = sum;
+    }
+}
+
+void Tensor::sum_cols(const Tensor& input, Tensor& output)
+{
+    assert(input.rank() == 2 && "sum_cols requires a 2D input tensor");
+    
+    size_t rows = input.shape()[0];
+    size_t cols = input.shape()[1];
+
+    output.reshape(Shape({cols, 1}));
+    output.fill(0.0f);
+
+    const scalar_t* in_ptr = input.data_ptr();
+    scalar_t* out_ptr = output.data_ptr();
+
+    for (size_t r = 0; r < rows; ++r)
+    {
+        for (size_t c = 0; c < cols; ++c)
+        {
+            out_ptr[c] += in_ptr[r * cols + c];
+        }
     }
 }
 
@@ -226,6 +263,30 @@ void Tensor::matmul(const Tensor& A, const Tensor& B, Tensor& C, bool transA, bo
                 C_ptr[i * ldc + j] = sum;
             }
         }
+    }
+}
+
+void Tensor::hadamard_product(const Tensor& A, const Tensor& B, Tensor& C)
+{
+    if (A.shape() != B.shape())
+    {
+        throw std::invalid_argument("Tensor::hadamard_product: Shapes mismatch");
+    }
+
+    if (C.shape() != A.shape())
+    {
+        C.reshape(A.shape());
+    }
+
+    const scalar_t* a_ptr = A.data_ptr();
+    const scalar_t* b_ptr = B.data_ptr();
+    scalar_t* c_ptr = C.data_ptr();
+    size_t n = A.size();
+
+#pragma omp parallel for if (n > 10000)
+    for (size_t i = 0; i < n; ++i)
+    {
+        c_ptr[i] = a_ptr[i] * b_ptr[i];
     }
 }
 

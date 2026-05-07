@@ -70,9 +70,9 @@ ConvLayer::ConvLayer(size_t input_h, size_t input_w, size_t input_c, size_t kern
 
 const Tensor& ConvLayer::forward(const Tensor& input, std::unique_ptr<LayerContext>& ctx, bool /*is_training*/) const
 {
-    if (input.rank() != 4) {
+    if (input.rank() != 4)
         throw std::invalid_argument("Runtime error: ConvLayer expected a 4D tensor [Batch, Channels, Height, Width].");
-    }
+
     ConvContext* conv_ctx = get_context<ConvContext>(ctx);
 
     const Shape input_shape = input.shape();

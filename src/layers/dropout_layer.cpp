@@ -7,70 +7,81 @@ DropoutLayer::DropoutLayer(scalar_t ratio)
     : ratio_(ratio)
 {}
 
+/*
+ * DROPOUT LAYER MAPPING & TERMINOLOGY:
+ * 
+ * 1. INPUT (X): [Batch x Features]
+ *    Matrix of activations from the previous layer.
+ * 
+ * 2. RATIO (p): Scalar (e.g., 0.5)
+ *    Probability of dropping out a unit.
+ * 
+ * 3. MASK (M): [Batch x Features]
+ *    Binary mask where each element is 0 with probability p, and 1/(1-p) otherwise
+ *    (inverted dropout to keep the expected value of activations unchanged).
+ * 
+ * 4. OUTPUT (Y): [Batch x Features]
+ *    Result: Y = X * M (element-wise).
+ */
+
 const Tensor& DropoutLayer::forward(const Tensor& input, std::unique_ptr<LayerContext>& ctx, bool is_training) const
 {
-    if (input.rank() < 2) {
+    if (input.rank() < 2)
         throw std::invalid_argument("Runtime error: DropoutLayer requires at least a 2D tensor (Batch, Features).");
-    }
-    if (!ctx)
-    {
-        ctx = std::make_unique<DropoutContext>();
-    }
-    auto* dropout_ctx = static_cast<DropoutContext*>(ctx.get());
 
+    /*
+     * STEP 1: TEST MODE
+     * -----------------
+     * During inference, dropout is deactivated.
+     * The input is returned as-is (no scaling needed thanks to inverted dropout).
+     */
     if (!is_training)
-    {
         return input;
-    }
 
-    if (dropout_ctx->output.shape() != input.shape())
-    {
-        dropout_ctx->mask.reshape(input.shape());
-        dropout_ctx->output.reshape(input.shape());
-    }
+    DropoutContext* dropout_ctx = get_context<DropoutContext>(ctx);
 
-    scalar_t scale = 1.0f / (1.0f - ratio_);
-    size_t n = input.size();
-    const scalar_t* in_ptr = input.data_ptr();
-    scalar_t* mask_ptr = dropout_ctx->mask.data_ptr();
-    scalar_t* out_ptr = dropout_ctx->output.data_ptr();
+    dropout_ctx->mask.reshape(input.shape());
+    dropout_ctx->output.reshape(input.shape());
 
-#pragma omp parallel if (n > 10000)
-    {
-        thread_local std::mt19937 gen(std::random_device{}());
-        std::uniform_real_distribution<scalar_t> dist(0.0f, 1.0f);
-#pragma omp for
-        for (size_t i = 0; i < n; ++i)
-        {
-            mask_ptr[i] = (dist(gen) > ratio_) ? scale : 0.0f;
-            out_ptr[i] = in_ptr[i] * mask_ptr[i];
-        }
-    }
+    /*
+     * STEP 2: TRAINING MODE (INVERTED DROPOUT)
+     * ----------------------------------------
+     * Generate a mask and scale the kept activations by 1/(1-p).
+     * This ensures the expected value of the output is the same as the input.
+     */
+    const scalar_t scale = 1.0f / (1.0f - ratio_);
+    dropout_ctx->mask.fill_random_mask(ratio_, scale);
+
+    /*
+     * STEP 3: APPLY MASK
+     * ------------------
+     * Element-wise multiplication of the input by the generated mask.
+     */
+    Tensor::hadamard_product(input, dropout_ctx->mask, dropout_ctx->output);
 
     return dropout_ctx->output;
 }
 
-const Tensor& DropoutLayer::backward(const Tensor& gradient, std::unique_ptr<LayerContext>& ctx, bool is_training)
+const Tensor& DropoutLayer::backward(const Tensor& gradient, std::unique_ptr<LayerContext>& ctx, [[maybe_unused]] bool is_training)
 {
-    assert(is_training && "Backward doit uniquement etre appele durant l'entrainement !");
-    (void)is_training;
-    auto* dropout_ctx = static_cast<DropoutContext*>(ctx.get());
+    /*
+     * BACKPROPAGATION OVERVIEW:
+     * -------------------------
+     * Dropout is an element-wise multiplication by a mask M.
+     * Y = X * M  =>  dY/dX = M
+     * Chain Rule: dL/dX = dL/dY * M (element-wise)
+     */
+    assert(is_training && "Backward must only be called during training!");
 
-    if (dropout_ctx->grad_input.shape() != gradient.shape())
-    {
-        dropout_ctx->grad_input.reshape(gradient.shape());
-    }
+    DropoutContext* dropout_ctx = get_context<DropoutContext>(ctx);
 
-    size_t n = gradient.size();
-    const scalar_t* grad_ptr = gradient.data_ptr();
-    const scalar_t* mask_ptr = dropout_ctx->mask.data_ptr();
-    scalar_t* in_grad_ptr = dropout_ctx->grad_input.data_ptr();
-
-#pragma omp parallel for if (n > 10000)
-    for (size_t i = 0; i < n; ++i)
-    {
-        in_grad_ptr[i] = grad_ptr[i] * mask_ptr[i];
-    }
+    /*
+     * STEP 1: APPLY MASK TO GRADIENT
+     * ------------------------------
+     * Only gradients corresponding to neurons that were NOT dropped are kept.
+     * They are also scaled by the same factor 1/(1-p).
+     */
+    Tensor::hadamard_product(gradient, dropout_ctx->mask, dropout_ctx->grad_input);
 
     return dropout_ctx->grad_input;
 }

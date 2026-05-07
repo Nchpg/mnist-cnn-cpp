@@ -35,9 +35,9 @@ DenseLayer::DenseLayer(size_t input_size, size_t output_size, std::mt19937& gen)
 
 const Tensor& DenseLayer::forward(const Tensor& input, std::unique_ptr<LayerContext>& ctx, bool /*is_training*/) const
 {
-    if (input.rank() != 2) {
+    if (input.rank() != 2)
         throw std::invalid_argument("Runtime error: DenseLayer expected a 2D tensor.");
-    }
+
     DenseContext* dense_ctx = get_context<DenseContext>(ctx);
 
     const Shape input_shape = input.shape();
@@ -87,7 +87,7 @@ const Tensor& DenseLayer::backward(const Tensor& gradient, std::unique_ptr<Layer
      * 3. dL/db (Grad Biases): sum_rows(dL/dY)    -> [O x 1]
      */
 
-    assert(is_training && "Backward doit uniquement etre appele durant l'entrainement !");
+    assert(is_training && "Backward must only be called during training!");
 
     DenseContext* dense_ctx = get_context<DenseContext>(ctx);
 
@@ -139,8 +139,7 @@ const Tensor& DenseLayer::backward(const Tensor& gradient, std::unique_ptr<Layer
      *    | dL/dy_{1,0} dL/dy_{1,1}| -- (Sum col 1 elements) -->   | dL/dy_{0,1} + dL/dy_{1,1} +..|
      *    +------------------------+                               +----------------------------+
      */
-    biases_grad_.fill(0.0f);
-    biases_grad_.add_bias(gradient);
+    Tensor::sum_cols(gradient, biases_grad_);
 
     return dense_ctx->grad_input;
 }
