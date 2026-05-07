@@ -17,7 +17,8 @@ class BatchNormLayer : public Layer
 {
 private:
     size_t channels_;
-    size_t spatial_size_;
+    size_t height_;
+    size_t width_;
     scalar_t momentum_ = 0.9f;
     scalar_t epsilon_ = 1e-5f;
 
@@ -29,7 +30,7 @@ private:
     mutable Tensor running_var_;
 
 public:
-    BatchNormLayer(size_t channels, size_t spatial_size);
+    BatchNormLayer(size_t channels, size_t height, size_t width);
     ~BatchNormLayer() override = default;
 
     const Tensor& forward(const Tensor& input, std::unique_ptr<LayerContext>& ctx, bool is_training) const override;
@@ -51,5 +52,6 @@ public:
 
     nlohmann::json get_config() const override;
 
-    Shape3D get_output_shape(const Shape3D& input_shape) const override;
+    Shape get_output_shape(const Shape& input_shape) const override;
+    Shape get_input_shape(const Shape& output_shape) const override;
 };

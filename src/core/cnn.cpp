@@ -49,8 +49,10 @@ void CNN::load_from_json(const std::string& config_path)
 
 void CNN::build_from_json(const nlohmann::json& config_data)
 {
-    input_shape_ = { config_data["input_shape"]["channels"], config_data["input_shape"]["height"],
-                     config_data["input_shape"]["width"] };
+    size_t c = config_data["input_shape"]["channels"];
+    size_t h = config_data["input_shape"]["height"];
+    size_t w = config_data["input_shape"]["width"];
+    input_shape_ = Shape({NULL, c, h, w});
 
     if (config_data.contains("hyperparameters"))
     {
@@ -84,7 +86,7 @@ void CNN::build_from_json(const nlohmann::json& config_data)
         history_ = config_data["history"].get<std::vector<json>>();
     }
 
-    Shape3D current_shape = input_shape_;
+    Shape current_shape = input_shape_;
     model_.layers().clear();
 
     for (const auto& layer_def : config_data["layers"])
@@ -95,7 +97,7 @@ void CNN::build_from_json(const nlohmann::json& config_data)
         {
             size_t filters = layer_def["filters"];
             size_t kernel_size = layer_def["kernel_size"];
-            auto layer = std::make_unique<ConvLayer>(current_shape.height, current_shape.width, current_shape.channels,
+            auto layer = std::make_unique<ConvLayer>(current_shape.height(), current_shape.width(), current_shape.channels(),
                                                      kernel_size, filters, gen_);
             current_shape = layer->get_output_shape(current_shape);
             model_.add(std::move(layer));
@@ -116,22 +118,22 @@ void CNN::build_from_json(const nlohmann::json& config_data)
         {
             size_t pool_size = layer_def["pool_size"];
             size_t stride = layer_def["stride"];
-            auto layer = std::make_unique<PoolingLayer>(current_shape.height, current_shape.width,
-                                                        current_shape.channels, pool_size, stride);
+            auto layer = std::make_unique<PoolingLayer>(current_shape.height(), current_shape.width(),
+                                                        current_shape.channels(), pool_size, stride);
             current_shape = layer->get_output_shape(current_shape);
             model_.add(std::move(layer));
         }
         else if (type == "Flatten")
         {
             auto layer =
-                std::make_unique<FlattenLayer>(current_shape.channels, current_shape.height, current_shape.width);
+                std::make_unique<FlattenLayer>(current_shape.channels(), current_shape.height(), current_shape.width());
             current_shape = layer->get_output_shape(current_shape);
             model_.add(std::move(layer));
         }
         else if (type == "Dense")
         {
             size_t units = layer_def["units"];
-            auto layer = std::make_unique<DenseLayer>(current_shape.size(), units, gen_);
+            auto layer = std::make_unique<DenseLayer>(current_shape.features(), units, gen_);
             current_shape = layer->get_output_shape(current_shape);
             model_.add(std::move(layer));
         }
@@ -145,7 +147,7 @@ void CNN::build_from_json(const nlohmann::json& config_data)
         else if (type == "BatchNorm")
         {
             auto layer =
-                std::make_unique<BatchNormLayer>(current_shape.channels, current_shape.height * current_shape.width);
+                std::make_unique<BatchNormLayer>(current_shape.channels(), current_shape.height(), current_shape.width());
             current_shape = layer->get_output_shape(current_shape);
             model_.add(std::move(layer));
         }
@@ -161,7 +163,7 @@ void CNN::build_from_json(const nlohmann::json& config_data)
 std::vector<scalar_t> CNN::predict(const Tensor& image) const
 {
     Tensor img_batch = image;
-    img_batch.reshape(Shape({ 1, input_shape_.channels, input_shape_.height, input_shape_.width }));
+    img_batch.reshape(Shape({ 1, input_shape_.channels(), input_shape_.height(), input_shape_.width() }));
 
     // Apply normalization if needed
     if (normalize_input_)
@@ -186,7 +188,7 @@ std::vector<scalar_t> CNN::predict(const Tensor& image) const
 int CNN::predict_label(const Tensor& image) const
 {
     Tensor img_batch = image;
-    img_batch.reshape(Shape({ 1, input_shape_.channels, input_shape_.height, input_shape_.width }));
+    img_batch.reshape(Shape({ 1, input_shape_.channels(), input_shape_.height(), input_shape_.width() }));
 
     // Apply normalization if needed
     if (normalize_input_)
@@ -265,7 +267,7 @@ void CNN::train(Dataset& dataset, size_t epochs)
             dataset.get_batch_images(sample, batch_size, batch_images);
             dataset.get_batch_labels(sample, batch_size, batch_labels);
 
-            batch_images.reshape(Shape({ batch_size, input_shape_.channels, input_shape_.height, input_shape_.width }));
+            batch_images.reshape(Shape({ static_cast<size_t>(batch_size), input_shape_.channels(), input_shape_.height(), input_shape_.width() }));
 
             const Tensor& output = model_.forward(batch_images, contexts, true);
 
@@ -334,7 +336,7 @@ scalar_t CNN::accuracy(const Dataset& dataset)
     size_t correct = 0;
     const size_t eval_batch_size = 64;
 
-    Tensor batch_images(Shape({ eval_batch_size, input_shape_.channels, input_shape_.height, input_shape_.width }),
+    Tensor batch_images(Shape({ eval_batch_size, input_shape_.channels(), input_shape_.height(), input_shape_.width() }),
                         0.0f);
     std::vector<size_t> batch_labels;
     std::vector<std::unique_ptr<LayerContext>> contexts;
@@ -346,7 +348,7 @@ scalar_t CNN::accuracy(const Dataset& dataset)
         dataset.get_batch_labels(i, actual_batch_size, batch_labels);
 
         batch_images.reshape(
-            Shape({ actual_batch_size, input_shape_.channels, input_shape_.height, input_shape_.width }));
+            Shape({ static_cast<size_t>(actual_batch_size), input_shape_.channels(), input_shape_.height(), input_shape_.width() }));
 
         const Tensor& logits = model_.forward(batch_images, contexts, false);
         auto predictions = Utils::argmax(logits);
@@ -367,9 +369,9 @@ void CNN::save(const std::string& path) const
         throw std::runtime_error("Save failed");
 
     json header;
-    header["input_shape"] = { { "channels", input_shape_.channels },
-                              { "height", input_shape_.height },
-                              { "width", input_shape_.width } };
+    header["input_shape"] = { { "channels", input_shape_.channels() },
+                              { "height", input_shape_.height() },
+                              { "width", input_shape_.width() } };
 
     header["hyperparameters"] = { { "batch_size", hp_.batch_size },
                                   { "loss", (hp_.loss_type == LossType::CrossEntropy) ? "CrossEntropy" : "MSE" },
@@ -442,7 +444,7 @@ void CNN::load_from_model(const std::string& path)
 void CNN::print_architecture() const
 {
     std::cout << "CNN Architecture:\n";
-    std::cout << "  Input Shape: " << input_shape_.channels << "x" << input_shape_.height << "x" << input_shape_.width
+    std::cout << "  Input Shape: " << input_shape_.channels() << "x" << input_shape_.height() << "x" << input_shape_.width()
               << "\n";
     std::cout << "  Hyperparameters:\n";
     std::cout << "    Batch Size: " << hp_.batch_size << "\n";

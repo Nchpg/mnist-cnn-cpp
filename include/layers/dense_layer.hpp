@@ -47,5 +47,6 @@ public:
 
     nlohmann::json get_config() const override;
 
-    Shape3D get_output_shape(const Shape3D& input_shape) const override;
+    Shape get_output_shape(const Shape& input_shape) const override;
+    Shape get_input_shape(const Shape& output_shape) const override;
 };

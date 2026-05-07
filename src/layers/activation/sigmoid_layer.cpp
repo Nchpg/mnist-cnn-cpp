@@ -1,12 +1,16 @@
 #include "layers/activation/sigmoid_layer.hpp"
 
 #include "layers/activation/activation.hpp"
+#include <stdexcept>
 
 SigmoidLayer::SigmoidLayer()
 {}
 
 const Tensor& SigmoidLayer::forward(const Tensor& input, std::unique_ptr<LayerContext>& ctx, bool is_training) const
 {
+    if (input.rank() < 2) {
+        throw std::invalid_argument("Runtime error: SigmoidLayer requires at least a 2D tensor (Batch, Features).");
+    }
     if (!ctx)
     {
         ctx = std::make_unique<SigmoidContext>();
@@ -48,7 +52,15 @@ nlohmann::json SigmoidLayer::get_config() const
     return { { "type", "Sigmoid" } };
 }
 
-Shape3D SigmoidLayer::get_output_shape(const Shape3D& input_shape) const
+Shape SigmoidLayer::get_output_shape(const Shape& input_shape) const
 {
+    if (input_shape.rank() < 2) {
+        throw std::invalid_argument("Architecture error: SigmoidLayer requires at least a 2D input (Batch, Features).");
+    }
     return input_shape;
+}
+
+Shape SigmoidLayer::get_input_shape(const Shape& output_shape) const
+{
+    return output_shape;
 }

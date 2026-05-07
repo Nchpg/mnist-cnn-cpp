@@ -1,6 +1,7 @@
 #include "layers/activation/softmax_layer.hpp"
 
 #include "layers/activation/activation.hpp"
+#include <stdexcept>
 
 SoftmaxLayer::SoftmaxLayer()
 {}
@@ -10,6 +11,9 @@ SoftmaxLayer::~SoftmaxLayer()
 
 const Tensor& SoftmaxLayer::forward(const Tensor& input, std::unique_ptr<LayerContext>& ctx, bool is_training) const
 {
+    if (input.rank() < 2) {
+        throw std::invalid_argument("Runtime error: SoftmaxLayer requires at least a 2D tensor (Batch, Features).");
+    }
     if (!ctx)
     {
         ctx = std::make_unique<SoftmaxContext>();
@@ -37,9 +41,17 @@ nlohmann::json SoftmaxLayer::get_config() const
     return { { "type", "Softmax" } };
 }
 
-Shape3D SoftmaxLayer::get_output_shape(const Shape3D& input_shape) const
+Shape SoftmaxLayer::get_output_shape(const Shape& input_shape) const
 {
+    if (input_shape.rank() < 2) {
+        throw std::invalid_argument("Architecture error: SoftmaxLayer requires at least a 2D input (Batch, Features).");
+    }
     return input_shape;
+}
+
+Shape SoftmaxLayer::get_input_shape(const Shape& output_shape) const
+{
+    return output_shape;
 }
 
 void SoftmaxLayer::save(std::ostream& os) const

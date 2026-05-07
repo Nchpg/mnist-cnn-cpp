@@ -16,18 +16,6 @@ inline uint32_t make_marker(const char* s)
     return v;
 }
 
-struct Shape3D
-{
-    size_t channels;
-    size_t height;
-    size_t width;
-
-    size_t size() const
-    {
-        return channels * height * width;
-    }
-};
-
 static constexpr size_t MAX_DIMS = 4;
 
 class Shape
@@ -103,4 +91,14 @@ public:
     {
         return dims_;
     }
+
+    // Pour le format NCHW (Batch, Channels, Height, Width) - Rank 4
+    size_t batch() const    { return dims_[0]; }
+    size_t channels() const { return dims_[1]; }
+    size_t height() const   { return dims_[2]; }
+    size_t width() const    { return dims_[3]; }
+
+    // Alias utile pour les tenseurs 2D comme en sortie de DenseLayer / Flatten (Batch, Features)
+    size_t features() const { return dims_[1]; }
+    size_t classes() const { return dims_[1]; }
 };

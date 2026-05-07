@@ -1,12 +1,16 @@
 #include "layers/activation/relu_layer.hpp"
 
 #include "layers/activation/activation.hpp"
+#include <stdexcept>
 
 ReluLayer::ReluLayer()
 {}
 
 const Tensor& ReluLayer::forward(const Tensor& input, std::unique_ptr<LayerContext>& ctx, bool is_training) const
 {
+    if (input.rank() < 2) {
+        throw std::invalid_argument("Runtime error: ReluLayer requires at least a 2D tensor (Batch, Features).");
+    }
     if (!ctx)
     {
         ctx = std::make_unique<ReluContext>();
@@ -52,7 +56,15 @@ nlohmann::json ReluLayer::get_config() const
     return { { "type", "ReLU" } };
 }
 
-Shape3D ReluLayer::get_output_shape(const Shape3D& input_shape) const
+Shape ReluLayer::get_output_shape(const Shape& input_shape) const
 {
+    if (input_shape.rank() < 2) {
+        throw std::invalid_argument("Architecture error: ReluLayer requires at least a 2D input (Batch, Features).");
+    }
     return input_shape;
+}
+
+Shape ReluLayer::get_input_shape(const Shape& output_shape) const
+{
+    return output_shape;
 }

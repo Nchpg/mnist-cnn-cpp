@@ -17,7 +17,7 @@ private:
     std::mt19937 gen_;
     static constexpr const char* MAGIC = "mnist-cnn";
     Hyperparameters hp_;
-    Shape3D input_shape_;
+    Shape input_shape_;
     std::vector<nlohmann::json> history_;
 
     scalar_t data_mean_ = 0.0f;

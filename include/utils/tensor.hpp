@@ -66,6 +66,7 @@ public:
     Tensor& operator+=(const Tensor& other);
     Tensor& operator-=(const Tensor& other);
     void add_scaled(const Tensor& other, scalar_t scale);
+    static void sum_rows(const Tensor& input, Tensor& output);
 
     static void matmul(const Tensor& A, const Tensor& B, Tensor& C, bool transA = false, bool transB = false);
 
@@ -74,6 +75,9 @@ public:
 
     scalar_t& operator()(size_t i, size_t j);
     const scalar_t& operator()(size_t i, size_t j) const;
+
+    scalar_t& operator()(size_t i);
+    const scalar_t& operator()(size_t i) const;
 
     void save(std::ostream& os) const;
     void load(std::istream& is);

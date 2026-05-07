@@ -1,6 +1,7 @@
 #include "layers/dropout_layer.hpp"
 
 #include <cassert>
+#include <stdexcept>
 
 DropoutLayer::DropoutLayer(scalar_t ratio)
     : ratio_(ratio)
@@ -8,6 +9,9 @@ DropoutLayer::DropoutLayer(scalar_t ratio)
 
 const Tensor& DropoutLayer::forward(const Tensor& input, std::unique_ptr<LayerContext>& ctx, bool is_training) const
 {
+    if (input.rank() < 2) {
+        throw std::invalid_argument("Runtime error: DropoutLayer requires at least a 2D tensor (Batch, Features).");
+    }
     if (!ctx)
     {
         ctx = std::make_unique<DropoutContext>();
@@ -94,7 +98,15 @@ nlohmann::json DropoutLayer::get_config() const
     return { { "type", "Dropout" }, { "ratio", ratio_ } };
 }
 
-Shape3D DropoutLayer::get_output_shape(const Shape3D& input_shape) const
+Shape DropoutLayer::get_output_shape(const Shape& input_shape) const
 {
+    if (input_shape.rank() < 2) {
+        throw std::invalid_argument("Architecture error: DropoutLayer requires at least a 2D input (Batch, Features).");
+    }
     return input_shape;
+}
+
+Shape DropoutLayer::get_input_shape(const Shape& output_shape) const
+{
+    return output_shape;
 }

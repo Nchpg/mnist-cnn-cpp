@@ -8,34 +8,31 @@ DenseLayer::DenseLayer(size_t input_size, size_t output_size, std::mt19937& gen)
     : input_size_(input_size)
     , output_size_(output_size)
 {
-    weights_.reshape(Shape({ output_size_, input_size_ }));
     biases_.reshape(Shape({ output_size_, 1 }));
-
-    const scalar_t std_dev = std::sqrt(2.0f / static_cast<scalar_t>(input_size));
-    weights_.random_normal(std_dev, gen);
     biases_.fill(0.0f);
+
+    // He Initialization
+    const scalar_t std_dev = std::sqrt(2.0f / static_cast<scalar_t>(input_size));
+    weights_.reshape(Shape({ output_size_, input_size_ }));
+    weights_.random_normal(std_dev, gen);
 }
 
-const Tensor& DenseLayer::forward(const Tensor& input, std::unique_ptr<LayerContext>& ctx, bool is_training) const
+const Tensor& DenseLayer::forward(const Tensor& input, std::unique_ptr<LayerContext>& ctx, bool /*is_training*/) const
 {
+    if (input.rank() != 2) {
+        throw std::invalid_argument("Runtime error: DenseLayer expected a 2D tensor.");
+    }
     if (!ctx)
     {
+        // Allocate the layer context if it does not exist yet.
         ctx = std::make_unique<DenseContext>();
     }
     auto* dense_ctx = static_cast<DenseContext*>(ctx.get());
 
     const size_t batch_size = input.shape()[0];
 
-    if (is_training)
-    {
-        dense_ctx->input_ptr = &input;
-    }
-
-    if (dense_ctx->activations.rank() != 2 || dense_ctx->activations.shape()[0] != batch_size
-        || dense_ctx->activations.shape()[1] != output_size_)
-    {
-        dense_ctx->activations.reshape(Shape({ batch_size, output_size_ }));
-    }
+    dense_ctx->input_ptr = &input;
+    dense_ctx->activations.reshape(Shape({ batch_size, output_size_ }));
 
     Tensor::matmul(input, weights_, dense_ctx->activations, false, true);
 
@@ -136,8 +133,18 @@ nlohmann::json DenseLayer::get_config() const
     return { { "type", "Dense" }, { "units", output_size_ } };
 }
 
-Shape3D DenseLayer::get_output_shape(const Shape3D& input_shape) const
+Shape DenseLayer::get_output_shape(const Shape& input_shape) const
 {
-    (void)input_shape;
-    return { output_size_, 1, 1 };
+    if (input_shape.rank() != 2) {
+        throw std::invalid_argument("Architecture error: DenseLayer requires a 2D input (Batch, Features). Did you forget a FlattenLayer?");
+    }
+    if (input_shape.features() != input_size_) {
+        throw std::invalid_argument("Architecture error: DenseLayer input feature size mismatch.");
+    }
+    return {input_shape.batch(), output_size_};
+}
+
+Shape DenseLayer::get_input_shape(const Shape& output_shape) const
+{
+    return {output_shape.batch(), input_size_};
 }

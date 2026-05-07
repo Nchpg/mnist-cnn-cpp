@@ -9,10 +9,12 @@ struct ConvContext : public LayerContext
 {
     Tensor output;
     Tensor grad_input;
-    Tensor col_buffer;
-    Tensor grad_view;
-    Tensor grad_col;
-    Tensor gemm_out;
+
+    // Buffer Tensors
+    Tensor input_patches_2d;
+    Tensor grad_output_2d;
+    Tensor grad_input_patches_2d;
+    Tensor raw_output_2d;
 };
 
 class ConvLayer : public Layer
@@ -53,5 +55,6 @@ public:
 
     nlohmann::json get_config() const override;
 
-    Shape3D get_output_shape(const Shape3D& input_shape) const override;
+    Shape get_output_shape(const Shape& input_shape) const override;
+    Shape get_input_shape(const Shape& output_shape) const override;
 };

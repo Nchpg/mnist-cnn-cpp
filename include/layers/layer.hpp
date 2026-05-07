@@ -39,5 +39,17 @@ public:
 
     virtual nlohmann::json get_config() const = 0;
 
-    virtual Shape3D get_output_shape(const Shape3D& input_shape) const = 0;
+    virtual Shape get_output_shape(const Shape& input_shape) const = 0;
+    virtual Shape get_input_shape(const Shape& output_shape) const = 0;
+
+protected:
+    template <typename T>
+    T* get_context(std::unique_ptr<LayerContext>& ctx) const
+    {
+        if (!ctx)
+        {
+            ctx = std::make_unique<T>();
+        }
+        return static_cast<T*>(ctx.get());
+    }
 };

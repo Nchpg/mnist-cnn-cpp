@@ -1,10 +1,12 @@
 #include "layers/batchnorm_layer.hpp"
 
 #include <cassert>
+#include <stdexcept>
 
-BatchNormLayer::BatchNormLayer(size_t channels, size_t spatial_size)
+BatchNormLayer::BatchNormLayer(size_t channels, size_t height, size_t width)
     : channels_(channels)
-    , spatial_size_(spatial_size)
+    , height_(height)
+    , width_(width)
 {
     gamma_.reshape(Shape({ channels, 1 }), 1.0f);
     beta_.reshape(Shape({ channels, 1 }), 0.0f);
@@ -14,6 +16,9 @@ BatchNormLayer::BatchNormLayer(size_t channels, size_t spatial_size)
 
 const Tensor& BatchNormLayer::forward(const Tensor& input, std::unique_ptr<LayerContext>& ctx, bool is_training) const
 {
+    if (input.rank() != 4) {
+        throw std::invalid_argument("Runtime error: BatchNormLayer expected a 4D tensor.");
+    }
     if (!ctx)
     {
         ctx = std::make_unique<BatchNormContext>();
@@ -32,7 +37,7 @@ const Tensor& BatchNormLayer::forward(const Tensor& input, std::unique_ptr<Layer
 
     size_t height = input.shape()[2];
     size_t width = input.shape()[3];
-    scalar_t N = static_cast<scalar_t>(spatial_size_ * batch_size);
+    scalar_t N = static_cast<scalar_t>(height_ * width_ * batch_size);
 
 #pragma omp parallel for if (channels_ > 1)
     for (size_t c = 0; c < channels_; ++c)
@@ -109,7 +114,7 @@ const Tensor& BatchNormLayer::backward(const Tensor& gradient, std::unique_ptr<L
     size_t batch_size = gradient.shape()[0];
     size_t height = gradient.shape()[2];
     size_t width = gradient.shape()[3];
-    scalar_t N = static_cast<scalar_t>(spatial_size_ * batch_size);
+    scalar_t N = static_cast<scalar_t>(height_ * width_ * batch_size);
 
     if (bn_ctx->grad_input.shape().rank() == 0 || bn_ctx->grad_input.shape()[0] != batch_size)
     {
@@ -180,9 +185,10 @@ void BatchNormLayer::save(std::ostream& os) const
     uint32_t marker = make_marker("BNRM");
     os.write(reinterpret_cast<const char*>(&marker), sizeof(marker));
 
-    uint64_t channels = channels_, spatial_size = spatial_size_;
+    uint64_t channels = channels_, height = height_, width = width_;
     os.write(reinterpret_cast<const char*>(&channels), sizeof(channels));
-    os.write(reinterpret_cast<const char*>(&spatial_size), sizeof(spatial_size));
+    os.write(reinterpret_cast<const char*>(&height), sizeof(height));
+    os.write(reinterpret_cast<const char*>(&width), sizeof(width));
 
     gamma_.save(os);
     beta_.save(os);
@@ -197,12 +203,14 @@ void BatchNormLayer::load(std::istream& is)
     if (marker != make_marker("BNRM"))
         throw std::runtime_error("Arch mismatch in BatchNormLayer load");
 
-    uint64_t channels, spatial_size;
+    uint64_t channels, height, width;
     is.read(reinterpret_cast<char*>(&channels), sizeof(channels));
-    is.read(reinterpret_cast<char*>(&spatial_size), sizeof(spatial_size));
+    is.read(reinterpret_cast<char*>(&height), sizeof(height));
+    is.read(reinterpret_cast<char*>(&width), sizeof(width));
 
     channels_ = channels;
-    spatial_size_ = spatial_size;
+    height_ = height;
+    width_ = width;
 
     gamma_.load(is);
     beta_.load(is);
@@ -215,7 +223,18 @@ nlohmann::json BatchNormLayer::get_config() const
     return { { "type", "BatchNorm" } };
 }
 
-Shape3D BatchNormLayer::get_output_shape(const Shape3D& input_shape) const
+Shape BatchNormLayer::get_output_shape(const Shape& input_shape) const
 {
+    if (input_shape.rank() != 4) {
+        throw std::invalid_argument("Architecture error: BatchNormLayer requires a 4D input (Batch, Channels, Height, Width).");
+    }
+    if (input_shape.channels() != channels_ || input_shape.height() != height_ || input_shape.width() != width_) {
+        throw std::invalid_argument("Architecture error: BatchNormLayer input dimensions do not match layer configuration.");
+    }
     return input_shape;
+}
+
+Shape BatchNormLayer::get_input_shape(const Shape& output_shape) const
+{
+    return output_shape;
 }

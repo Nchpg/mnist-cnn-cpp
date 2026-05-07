@@ -114,6 +114,35 @@ void Tensor::add_scaled(const Tensor& other, scalar_t scale)
         data_[i] += other.data_[i] * scale;
 }
 
+
+void Tensor::sum_rows(const Tensor& input, Tensor& output)
+{
+    assert(input.rank() == 2 && "sum_rows requires a 2D input tensor");
+    
+    size_t rows = input.shape()[0];
+    size_t cols = input.shape()[1];
+
+    // Redimensionne la sortie si nécessaire (matrice colonne)
+    if (output.rank() != 2 || output.shape()[0] != rows || output.shape()[1] != 1)
+    {
+        output.reshape(Shape({rows, 1}));
+    }
+
+    const scalar_t* in_ptr = input.data_ptr();
+    scalar_t* out_ptr = output.data_ptr();
+
+    #pragma omp parallel for
+    for (size_t r = 0; r < rows; ++r)
+    {
+        scalar_t sum = 0.0f;
+        for (size_t c = 0; c < cols; ++c)
+        {
+            sum += in_ptr[r * cols + c];
+        }
+        out_ptr[r] = sum;
+    }
+}
+
 void Tensor::matmul(const Tensor& A, const Tensor& B, Tensor& C, bool transA, bool transB)
 {
     assert(A.rank() == 2 && "Matmul: A must be 2D");
@@ -204,6 +233,20 @@ const scalar_t& Tensor::operator()(size_t i, size_t j) const
     assert(rank() == 2);
     assert(i < shape_[0] && j < shape_[1]);
     return data_[i * strides_[0] + j];
+}
+
+scalar_t& Tensor::operator()(size_t i)
+{
+    assert(rank() == 1);
+    assert(i < shape_[0]);
+    return data_[i];
+}
+
+const scalar_t& Tensor::operator()(size_t i) const
+{
+    assert(rank() == 1);
+    assert(i < shape_[0]);
+    return data_[i];
 }
 
 void Tensor::save(std::ostream& os) const
