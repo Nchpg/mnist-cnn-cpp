@@ -8,37 +8,72 @@ FlattenLayer::FlattenLayer(size_t channels, size_t height, size_t width)
     , input_width_(width)
 {}
 
-const Tensor& FlattenLayer::forward(const Tensor& input, std::unique_ptr<LayerContext>& ctx, bool is_training) const
+/*
+ * FLATTEN LAYER MAPPING & TERMINOLOGY:
+ *
+ * 1. INPUT (X): [Batch x Channels x Height x Width]
+ *    4D Tensor from a Convolutional or Pooling layer.
+ *
+ * 2. OUTPUT (Y): [Batch x (Channels * Height * Width)]
+ *    2D Tensor where all spatial and channel dimensions are collapsed into one.
+ *    Used to transition to Dense (Fully Connected) layers.
+ */
+
+const Tensor& FlattenLayer::forward(const Tensor& input, std::unique_ptr<LayerContext>& ctx, bool /*is_training*/) const
 {
     if (input.rank() != 4)
-    {
         throw std::invalid_argument("Runtime error: FlattenLayer expected a 4D tensor.");
-    }
-    if (!ctx)
-    {
-        ctx = std::make_unique<FlattenContext>();
-    }
-    auto* flatten_ctx = static_cast<FlattenContext*>(ctx.get());
 
-    size_t batch_size = input.shape()[0];
-    size_t flat_size = input_channels_ * input_height_ * input_width_;
+    FlattenContext* flatten_ctx = get_context<FlattenContext>(ctx);
 
-    flatten_ctx->output.reshape(Shape({ batch_size, flat_size }));
+    const Shape input_shape = input.shape();
 
-    std::copy_n(input.data_ptr(), input.size(), flatten_ctx->output.data_ptr());
+    /*
+     * STEP 1: DATA COPY
+     * -----------------
+     * We copy the entire raw data from the input tensor.
+     * Flattening doesn't change the values, only their logical organization.
+     */
+    flatten_ctx->output.data() = input.data();
 
-    (void)is_training;
+    /*
+     * STEP 2: RESHAPE
+     * ---------------
+     * Update the metadata (shape and strides) to reflect the 2D "flattened" view.
+     */
+    flatten_ctx->output.reshape(get_output_shape(input_shape));
+
     return flatten_ctx->output;
 }
 
-const Tensor& FlattenLayer::backward(const Tensor& gradient, std::unique_ptr<LayerContext>& ctx, bool is_training)
+const Tensor& FlattenLayer::backward(const Tensor& gradient, std::unique_ptr<LayerContext>& ctx,
+                                     [[maybe_unused]] bool is_training)
 {
-    auto* flatten_ctx = static_cast<FlattenContext*>(ctx.get());
-    size_t batch_size = gradient.shape()[0];
-    flatten_ctx->grad_input.reshape(Shape({ batch_size, input_channels_, input_height_, input_width_ }));
+    /*
+     * BACKPROPAGATION OVERVIEW:
+     * -------------------------
+     * Flattening is essentially a reshape operation. Since it is a
+     * identity mapping of the values, the gradient dL/dX is identical
+     * to dL/dY, simply reshaped to the input structure.
+     */
+    FlattenContext* flatten_ctx = get_context<FlattenContext>(ctx);
 
-    std::copy(gradient.data().begin(), gradient.data().end(), flatten_ctx->grad_input.data().begin());
-    (void)is_training;
+    const Shape output_shape = gradient.shape();
+
+    /*
+     * STEP 1: GRADIENT DATA COPY
+     * --------------------------
+     * Copy the incoming flattened gradient to the input-shaped tensor.
+     */
+    flatten_ctx->grad_input.data() = gradient.data();
+
+    /*
+     * STEP 2: RESHAPE
+     * ---------------
+     * Map the [Batch x Features] gradient back to [Batch x C x H x W].
+     */
+    flatten_ctx->grad_input.reshape(get_input_shape(output_shape));
+
     return flatten_ctx->grad_input;
 }
 
