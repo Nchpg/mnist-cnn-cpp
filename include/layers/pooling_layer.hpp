@@ -4,12 +4,13 @@
 #include <vector>
 
 #include "layers/layer.hpp"
+#include "utils/argmax_tensor.hpp"
 
 struct PoolingContext : public LayerContext
 {
     Tensor output;
     Tensor grad_input;
-    std::vector<size_t> argmax_indices;
+    ArgmaxTensor argmax_indices;
 };
 
 class PoolingLayer : public Layer
@@ -34,4 +35,7 @@ public:
 
     Shape get_output_shape(const Shape& input_shape) const override;
     Shape get_input_shape(const Shape& output_shape) const override;
+
+private:
+    void perform_pooling(const Tensor& input, PoolingContext* pool_ctx, bool is_training) const;
 };

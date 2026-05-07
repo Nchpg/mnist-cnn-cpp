@@ -15,29 +15,43 @@ PoolingLayer::PoolingLayer(size_t input_h, size_t input_w, size_t input_c, size_
     out_w_ = (input_w - pool_size) / stride + 1;
 }
 
+/*
+ * POOLING LAYER MAPPING & TERMINOLOGY:
+ *
+ * 1. INPUT (X): [Batch x Channels x Height x Width]
+ *    Spatial feature map from a convolutional layer.
+ *
+ * 2. POOL_SIZE / STRIDE:
+ *    Window size and step for downsampling the spatial dimensions.
+ *
+ * 3. ARGMAX INDICES:
+ *    Stores the flattened input indices of the maximum values selected
+ *    during forward pass to route gradients in backward pass.
+ *
+ * 4. OUTPUT (Y): [Batch x Channels x Out_H x Out_W]
+ *    Downsampled feature map containing the local maximums.
+ */
+
 const Tensor& PoolingLayer::forward(const Tensor& input, std::unique_ptr<LayerContext>& ctx, bool is_training) const
 {
     if (input.rank() != 4)
-    {
         throw std::invalid_argument("Runtime error: PoolingLayer expected a 4D tensor.");
-    }
-    if (!ctx)
-    {
-        ctx = std::make_unique<PoolingContext>();
-    }
-    auto* pool_ctx = static_cast<PoolingContext*>(ctx.get());
 
-    size_t batch_size = input.shape()[0];
+    PoolingContext* pool_ctx = get_context<PoolingContext>(ctx);
 
-    if (pool_ctx->output.shape().rank() == 0 || pool_ctx->output.shape()[0] != batch_size)
-    {
-        pool_ctx->output.reshape(Shape({ batch_size, in_c_, out_h_, out_w_ }));
-        if (is_training)
-        {
-            pool_ctx->argmax_indices.resize(pool_ctx->output.size());
-        }
-    }
+    const Shape input_shape = input.shape();
+    const size_t batch_size = input_shape.batch();
 
+    pool_ctx->output.reshape(get_output_shape(input_shape));
+    if (is_training)
+        pool_ctx->argmax_indices.reshape(pool_ctx->output.shape());
+
+    /*
+     * STEP 1: MAX POOLING OPERATION
+     * -----------------------------
+     * For each window, find the maximum activation and store its position.
+     * We slide over the spatial dimensions (H, W) per channel.
+     */
 #pragma omp parallel for collapse(2)
     for (size_t b = 0; b < batch_size; ++b)
     {
@@ -71,31 +85,43 @@ const Tensor& PoolingLayer::forward(const Tensor& input, std::unique_ptr<LayerCo
                     pool_ctx->output(b, c, i, j) = max_val;
                     if (is_training)
                     {
-                        size_t out_idx = ((b * in_c_ + c) * out_h_ + i) * out_w_ + j;
-                        pool_ctx->argmax_indices[out_idx] = max_idx;
+                        pool_ctx->argmax_indices(b, c, i, j) = max_idx;
                     }
                 }
             }
         }
     }
 
-    (void)is_training;
     return pool_ctx->output;
 }
 
-const Tensor& PoolingLayer::backward(const Tensor& gradient, std::unique_ptr<LayerContext>& ctx, bool is_training)
+const Tensor& PoolingLayer::backward(const Tensor& gradient, std::unique_ptr<LayerContext>& ctx,
+                                     [[maybe_unused]] bool is_training)
 {
-    assert(is_training && "Backward doit uniquement etre appele durant l'entrainement !");
-    (void)is_training;
-    auto* pool_ctx = static_cast<PoolingContext*>(ctx.get());
+    /*
+     * BACKPROPAGATION OVERVIEW:
+     * -------------------------
+     * Max pooling routes the gradient dL/dY only to the neuron that was
+     * selected as the maximum during the forward pass.
+     */
+    assert(is_training && "Backward must only be called during training!");
 
-    size_t batch_size = gradient.shape()[0];
-    if (pool_ctx->grad_input.shape().rank() == 0 || pool_ctx->grad_input.shape()[0] != batch_size)
-    {
-        pool_ctx->grad_input.reshape(Shape({ batch_size, in_c_, in_h_, in_w_ }));
-    }
+    PoolingContext* pool_ctx = get_context<PoolingContext>(ctx);
+
+    const Shape output_shape = gradient.shape();
+    const size_t batch_size = output_shape.batch();
+
+    pool_ctx->grad_input.reshape(get_input_shape(output_shape));
+
+    // Clear gradients for accumulation
     pool_ctx->grad_input.fill(0.0f);
 
+    /*
+     * STEP 1: GRADIENT ROUTING
+     * ------------------------
+     * Distribute the gradient from the output back to the specific
+     * maximum input position stored in argmax_indices.
+     */
 #pragma omp parallel for collapse(2)
     for (size_t b = 0; b < batch_size; ++b)
     {
@@ -105,8 +131,7 @@ const Tensor& PoolingLayer::backward(const Tensor& gradient, std::unique_ptr<Lay
             {
                 for (size_t j = 0; j < out_w_; ++j)
                 {
-                    size_t out_idx = ((b * in_c_ + c) * out_h_ + i) * out_w_ + j;
-                    size_t max_in_idx = pool_ctx->argmax_indices[out_idx];
+                    size_t max_in_idx = pool_ctx->argmax_indices(b, c, i, j);
                     size_t in_r = max_in_idx / in_w_;
                     size_t in_c = max_in_idx % in_w_;
 
