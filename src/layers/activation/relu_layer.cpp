@@ -1,14 +1,16 @@
 #include "layers/activation/relu_layer.hpp"
 
-#include "layers/activation/activation.hpp"
 #include <stdexcept>
+
+#include "layers/activation/activation.hpp"
 
 ReluLayer::ReluLayer()
 {}
 
 const Tensor& ReluLayer::forward(const Tensor& input, std::unique_ptr<LayerContext>& ctx, bool is_training) const
 {
-    if (input.rank() < 2) {
+    if (input.rank() < 2)
+    {
         throw std::invalid_argument("Runtime error: ReluLayer requires at least a 2D tensor (Batch, Features).");
     }
     if (!ctx)
@@ -58,7 +60,8 @@ nlohmann::json ReluLayer::get_config() const
 
 Shape ReluLayer::get_output_shape(const Shape& input_shape) const
 {
-    if (input_shape.rank() < 2) {
+    if (input_shape.rank() < 2)
+    {
         throw std::invalid_argument("Architecture error: ReluLayer requires at least a 2D input (Batch, Features).");
     }
     return input_shape;

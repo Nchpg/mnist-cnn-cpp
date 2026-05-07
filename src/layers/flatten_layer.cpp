@@ -10,7 +10,8 @@ FlattenLayer::FlattenLayer(size_t channels, size_t height, size_t width)
 
 const Tensor& FlattenLayer::forward(const Tensor& input, std::unique_ptr<LayerContext>& ctx, bool is_training) const
 {
-    if (input.rank() != 4) {
+    if (input.rank() != 4)
+    {
         throw std::invalid_argument("Runtime error: FlattenLayer expected a 4D tensor.");
     }
     if (!ctx)
@@ -73,16 +74,21 @@ nlohmann::json FlattenLayer::get_config() const
 
 Shape FlattenLayer::get_output_shape(const Shape& input_shape) const
 {
-    if (input_shape.rank() != 4) {
-        throw std::invalid_argument("Architecture error: FlattenLayer requires a 4D input (Batch, Channels, Height, Width).");
+    if (input_shape.rank() != 4)
+    {
+        throw std::invalid_argument(
+            "Architecture error: FlattenLayer requires a 4D input (Batch, Channels, Height, Width).");
     }
-    if (input_shape.channels() != input_channels_ || input_shape.height() != input_height_ || input_shape.width() != input_width_) {
-        throw std::invalid_argument("Architecture error: FlattenLayer input dimensions do not match layer configuration.");
+    if (input_shape.channels() != input_channels_ || input_shape.height() != input_height_
+        || input_shape.width() != input_width_)
+    {
+        throw std::invalid_argument(
+            "Architecture error: FlattenLayer input dimensions do not match layer configuration.");
     }
-    return {input_shape.batch(), input_shape.channels() * input_shape.height() * input_shape.width()};
+    return { input_shape.batch(), input_shape.channels() * input_shape.height() * input_shape.width() };
 }
 
 Shape FlattenLayer::get_input_shape(const Shape& output_shape) const
 {
-    return {output_shape.batch(), input_channels_, input_height_, input_width_};
+    return { output_shape.batch(), input_channels_, input_height_, input_width_ };
 }

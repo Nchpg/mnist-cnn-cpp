@@ -17,7 +17,8 @@ PoolingLayer::PoolingLayer(size_t input_h, size_t input_w, size_t input_c, size_
 
 const Tensor& PoolingLayer::forward(const Tensor& input, std::unique_ptr<LayerContext>& ctx, bool is_training) const
 {
-    if (input.rank() != 4) {
+    if (input.rank() != 4)
+    {
         throw std::invalid_argument("Runtime error: PoolingLayer expected a 4D tensor.");
     }
     if (!ctx)
@@ -161,16 +162,20 @@ nlohmann::json PoolingLayer::get_config() const
 
 Shape PoolingLayer::get_output_shape(const Shape& input_shape) const
 {
-    if (input_shape.rank() != 4) {
-        throw std::invalid_argument("Architecture error: PoolingLayer requires a 4D input (Batch, Channels, Height, Width).");
+    if (input_shape.rank() != 4)
+    {
+        throw std::invalid_argument(
+            "Architecture error: PoolingLayer requires a 4D input (Batch, Channels, Height, Width).");
     }
-    if (input_shape.channels() != in_c_ || input_shape.height() != in_h_ || input_shape.width() != in_w_) {
-        throw std::invalid_argument("Architecture error: PoolingLayer input dimensions do not match layer configuration.");
+    if (input_shape.channels() != in_c_ || input_shape.height() != in_h_ || input_shape.width() != in_w_)
+    {
+        throw std::invalid_argument(
+            "Architecture error: PoolingLayer input dimensions do not match layer configuration.");
     }
-    return {input_shape.batch(), in_c_, out_h_, out_w_};
+    return { input_shape.batch(), in_c_, out_h_, out_w_ };
 }
 
 Shape PoolingLayer::get_input_shape(const Shape& output_shape) const
 {
-    return {output_shape.batch(), in_c_, in_h_, in_w_};
+    return { output_shape.batch(), in_c_, in_h_, in_w_ };
 }

@@ -9,17 +9,17 @@ DropoutLayer::DropoutLayer(scalar_t ratio)
 
 /*
  * DROPOUT LAYER MAPPING & TERMINOLOGY:
- * 
+ *
  * 1. INPUT (X): [Batch x Features]
  *    Matrix of activations from the previous layer.
- * 
+ *
  * 2. RATIO (p): Scalar (e.g., 0.5)
  *    Probability of dropping out a unit.
- * 
+ *
  * 3. MASK (M): [Batch x Features]
  *    Binary mask where each element is 0 with probability p, and 1/(1-p) otherwise
  *    (inverted dropout to keep the expected value of activations unchanged).
- * 
+ *
  * 4. OUTPUT (Y): [Batch x Features]
  *    Result: Y = X * M (element-wise).
  */
@@ -62,7 +62,8 @@ const Tensor& DropoutLayer::forward(const Tensor& input, std::unique_ptr<LayerCo
     return dropout_ctx->output;
 }
 
-const Tensor& DropoutLayer::backward(const Tensor& gradient, std::unique_ptr<LayerContext>& ctx, [[maybe_unused]] bool is_training)
+const Tensor& DropoutLayer::backward(const Tensor& gradient, std::unique_ptr<LayerContext>& ctx,
+                                     [[maybe_unused]] bool is_training)
 {
     /*
      * BACKPROPAGATION OVERVIEW:
@@ -111,7 +112,8 @@ nlohmann::json DropoutLayer::get_config() const
 
 Shape DropoutLayer::get_output_shape(const Shape& input_shape) const
 {
-    if (input_shape.rank() < 2) {
+    if (input_shape.rank() < 2)
+    {
         throw std::invalid_argument("Architecture error: DropoutLayer requires at least a 2D input (Batch, Features).");
     }
     return input_shape;

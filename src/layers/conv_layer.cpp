@@ -5,14 +5,17 @@
 #include <omp.h>
 #include <stdexcept>
 
-struct ConvIndexingView {
+struct ConvIndexingView
+{
     size_t k_size, out_h, out_w;
 
-    inline size_t row_idx(size_t c, size_t ky, size_t kx) const {
+    inline size_t row_idx(size_t c, size_t ky, size_t kx) const
+    {
         return c * (k_size * k_size) + ky * k_size + kx;
     }
 
-    inline size_t col_idx(size_t b, size_t y, size_t x) const {
+    inline size_t col_idx(size_t b, size_t y, size_t x) const
+    {
         return b * (out_h * out_w) + y * out_w + x;
     }
 };
@@ -28,7 +31,7 @@ ConvLayer::ConvLayer(size_t input_h, size_t input_w, size_t input_c, size_t kern
     out_h_ = input_h - kernel_size + 1;
     out_w_ = input_w - kernel_size + 1;
 
-    biases_.reshape(Shape({ out_c_}));
+    biases_.reshape(Shape({ out_c_ }));
     biases_.fill(0.0f);
 
     // He Initialization
@@ -39,7 +42,7 @@ ConvLayer::ConvLayer(size_t input_h, size_t input_w, size_t input_c, size_t kern
 
 /*
  * CONVOLUTIONAL MAPPING & TERMINOLOGY:
- * 
+ *
  * 1. PATCH (P_n): Local Receptive Field.
  *    A spatial sub-volume [In_Channels, K_Size, K_Size] of the input tensor.
  *    - Represented as a COLUMN in the 'input_patches_2d' matrix.
@@ -51,7 +54,7 @@ ConvLayer::ConvLayer(size_t input_h, size_t input_w, size_t input_c, size_t kern
  *    - Represented as a ROW in the 'filters_' matrix.
  *    - Index m ∈ [0, M-1], where M = Out_Channels.
  *    - Elements: w_{m,k} (weight k of filter m).
- * 
+ *
  * 3. VOLUME (K): Depth of Dot Product.
  *    Total elements in a patch or filter (In_Channels * K_Size * K_Size).
  *    - Index k ∈ [0, K-1].
@@ -81,27 +84,27 @@ const Tensor& ConvLayer::forward(const Tensor& input, std::unique_ptr<LayerConte
     conv_ctx->output.reshape(get_output_shape(input.shape()));
     conv_ctx->input_patches_2d.reshape(Shape({ in_c_ * k_size_ * k_size_, batch_size * out_h_ * out_w_ }));
     conv_ctx->raw_output_2d.reshape(Shape({ out_c_, batch_size * out_h_ * out_w_ }));
-    ConvIndexingView view{k_size_, out_h_, out_w_};
+    ConvIndexingView view{ k_size_, out_h_, out_w_ };
 
-    /*
-     * STEP 1: IM2COL TRANSFORMATION (4D Tensor -> 2D Patches Matrix)
-     * -----------------------------------------------------------------
-     * We slide the kernel over the 4D input volume to extract local 
-     * neighborhoods (patches) and rearrange them into columns of a 2D matrix.
-     * 
-     * Mapping: Input[b, c, y + ky, x + kx] -> Patches_2D[k, n]
-     * 
-     *  INPUT (4D Volume) [B, C, H, W]           PATCHES_2D [K x N]
-     *  (Conceptual Extraction)                  <--------------- N (Patches) --------------->
-     *       _______                             +-------------------------------------------+
-     *      /      /|   -- Extract P_0 -->       |  P_0      |  P_1      | ... |  P_{N-1}    | ^
-     *     /______/ |   -- Extract P_1 -->       |   |       |   |       |     |    |        | | K (Volume)
-     *    |       | |      ...                   | x_{0,0}   | x_{0,1}   |     | x_{0,N-1}   | |
-     *    |       |/    -- Extract P_{N-1} -->   |  ...      |  ...      |     |  ...        | |
-     *    |_______/                              | x_{K-1,0} | x_{K-1,1} |     | x_{K-1,N-1} | v
-     *                                           +-------------------------------------------+
-     */
-    #pragma omp parallel for collapse(2) if (batch_size * in_c_ > 4)
+/*
+ * STEP 1: IM2COL TRANSFORMATION (4D Tensor -> 2D Patches Matrix)
+ * -----------------------------------------------------------------
+ * We slide the kernel over the 4D input volume to extract local
+ * neighborhoods (patches) and rearrange them into columns of a 2D matrix.
+ *
+ * Mapping: Input[b, c, y + ky, x + kx] -> Patches_2D[k, n]
+ *
+ *  INPUT (4D Volume) [B, C, H, W]           PATCHES_2D [K x N]
+ *  (Conceptual Extraction)                  <--------------- N (Patches) --------------->
+ *       _______                             +-------------------------------------------+
+ *      /      /|   -- Extract P_0 -->       |  P_0      |  P_1      | ... |  P_{N-1}    | ^
+ *     /______/ |   -- Extract P_1 -->       |   |       |   |       |     |    |        | | K (Volume)
+ *    |       | |      ...                   | x_{0,0}   | x_{0,1}   |     | x_{0,N-1}   | |
+ *    |       |/    -- Extract P_{N-1} -->   |  ...      |  ...      |     |  ...        | |
+ *    |_______/                              | x_{K-1,0} | x_{K-1,1} |     | x_{K-1,N-1} | v
+ *                                           +-------------------------------------------+
+ */
+#pragma omp parallel for collapse(2) if (batch_size * in_c_ > 4)
     for (size_t b = 0; b < batch_size; ++b)
     {
         for (size_t c = 0; c < in_c_; ++c)
@@ -124,7 +127,7 @@ const Tensor& ConvLayer::forward(const Tensor& input, std::unique_ptr<LayerConte
         }
     }
 
-     /*
+    /*
      * STEP 2: GEMM-BASED CONVOLUTION (Filters * Patches)
      * -----------------------------------------------------------------
      * Operation: Raw_Output_2D = Filters_Matrix * Patches_Matrix.
@@ -162,12 +165,12 @@ const Tensor& ConvLayer::forward(const Tensor& input, std::unique_ptr<LayerConte
      */
     Tensor::matmul(filters_, conv_ctx->input_patches_2d, conv_ctx->raw_output_2d);
 
-    /*
-     * STEP 3: BIAS ADDITION & OUTPUT RESHAPING (2D -> 4D)
-     * -----------------------------------------------------------------
-     * Add the bias term to each dot product result and reshape into the 4D output tensor.
-     */
-    #pragma omp parallel for collapse(4) if (batch_size * out_c_ * out_h_ * out_w_ > 100)
+/*
+ * STEP 3: BIAS ADDITION & OUTPUT RESHAPING (2D -> 4D)
+ * -----------------------------------------------------------------
+ * Add the bias term to each dot product result and reshape into the 4D output tensor.
+ */
+#pragma omp parallel for collapse(4) if (batch_size * out_c_ * out_h_ * out_w_ > 100)
     for (size_t b = 0; b < batch_size; ++b)
     {
         for (size_t c = 0; c < out_c_; ++c)
@@ -186,7 +189,8 @@ const Tensor& ConvLayer::forward(const Tensor& input, std::unique_ptr<LayerConte
     return conv_ctx->output;
 }
 
-const Tensor& ConvLayer::backward(const Tensor& gradient, std::unique_ptr<LayerContext>& ctx, [[maybe_unused]] bool is_training)
+const Tensor& ConvLayer::backward(const Tensor& gradient, std::unique_ptr<LayerContext>& ctx,
+                                  [[maybe_unused]] bool is_training)
 {
     /*
      * BACKPROPAGATION OVERVIEW:
@@ -209,24 +213,24 @@ const Tensor& ConvLayer::backward(const Tensor& gradient, std::unique_ptr<LayerC
     conv_ctx->grad_input.reshape(get_input_shape(output_shape));
     conv_ctx->grad_output_2d.reshape(Shape({ out_c_, batch_size * out_h_ * out_w_ }));
     conv_ctx->grad_input_patches_2d.reshape(Shape({ in_c_ * k_size_ * k_size_, batch_size * out_h_ * out_w_ }));
-    
-    ConvIndexingView view{k_size_, out_h_, out_w_};
 
-    /*
-     * STEP 1: GRADIENT REARRANGEMENT (4D Tensor -> 2D Matrix)
-     * -----------------------------------------------------------------
-     * Flatten dL/dOut [Batch, M, OH, OW] into a 2D matrix [M x N].
-     * 
-     *  dL/dOut (4D Volume) [B, M, OH, OW]             dL/dOut_2D [M x N]
-     *  (Conceptual Flattening)               <--------------- N (Patches) --------------->
-     *       _______                          +-------------------------------------------+
-     *      /      /|   -- Flatten F_0 -->    | Row 0: [dL/dOut_{0,0} ... dL/dOut_{0,N-1}]| ^
-     *     /______/ |   -- Flatten F_1 -->    | Row 1: [dL/dOut_{1,0} ... dL/dOut_{1,N-1}]| | M (Filters)
-     *    |       | |      ...                |  ...                                      | |
-     *    |       |/    -- Flatten F_{M-1} -> | Row M-1: [ ... ]                          | v
-     *    |_______/                           +-------------------------------------------+
-     */
-    #pragma omp parallel for collapse(2)
+    ConvIndexingView view{ k_size_, out_h_, out_w_ };
+
+/*
+ * STEP 1: GRADIENT REARRANGEMENT (4D Tensor -> 2D Matrix)
+ * -----------------------------------------------------------------
+ * Flatten dL/dOut [Batch, M, OH, OW] into a 2D matrix [M x N].
+ *
+ *  dL/dOut (4D Volume) [B, M, OH, OW]             dL/dOut_2D [M x N]
+ *  (Conceptual Flattening)               <--------------- N (Patches) --------------->
+ *       _______                          +-------------------------------------------+
+ *      /      /|   -- Flatten F_0 -->    | Row 0: [dL/dOut_{0,0} ... dL/dOut_{0,N-1}]| ^
+ *     /______/ |   -- Flatten F_1 -->    | Row 1: [dL/dOut_{1,0} ... dL/dOut_{1,N-1}]| | M (Filters)
+ *    |       | |      ...                |  ...                                      | |
+ *    |       |/    -- Flatten F_{M-1} -> | Row M-1: [ ... ]                          | v
+ *    |_______/                           +-------------------------------------------+
+ */
+#pragma omp parallel for collapse(2)
     for (size_t b = 0; b < batch_size; ++b)
     {
         for (size_t f = 0; f < out_c_; ++f)
@@ -247,7 +251,7 @@ const Tensor& ConvLayer::backward(const Tensor& gradient, std::unique_ptr<LayerC
      * -----------------------------------------------------------------
      * Derivation: Out = (W * X) + b  =>  dOut/db = 1.
      * Chain Rule: dL/db = sum( dL/dOut * dOut/db ) = sum( dL/dOut ).
-     * 
+     *
      *   grad_output_2d (dL/dOut) [M x N]           biases_grad (dL/db)
      *   <----------- N (Patches) ---------->
      *   +------------------------------------+       +-------------+
@@ -337,12 +341,12 @@ const Tensor& ConvLayer::backward(const Tensor& gradient, std::unique_ptr<LayerC
      * -----------------------------------------------------------------
      * Accumulate elements from the 2D gradient matrix dL/dX_patches [K x N]
      * into the final 4D input gradient tensor dL/dX [Batch, In_C, In_H, In_W].
-     * 
-     * Since input pixels are shared between overlapping patches, we must 
+     *
+     * Since input pixels are shared between overlapping patches, we must
      * accumulate (sum) all gradients that reach the same pixel.
      */
     conv_ctx->grad_input.fill(0.0f);
-    #pragma omp parallel for collapse(2)
+#pragma omp parallel for collapse(2)
     for (size_t b = 0; b < batch_size; ++b)
     {
         for (size_t c = 0; c < in_c_; ++c)
@@ -357,7 +361,8 @@ const Tensor& ConvLayer::backward(const Tensor& gradient, std::unique_ptr<LayerC
                         for (size_t x = 0; x < out_w_; ++x)
                         {
                             size_t col_idx = view.col_idx(b, y, x);
-                            conv_ctx->grad_input(b, c, y + ky, x + kx) += conv_ctx->grad_input_patches_2d(row_idx, col_idx);
+                            conv_ctx->grad_input(b, c, y + ky, x + kx) +=
+                                conv_ctx->grad_input_patches_2d(row_idx, col_idx);
                         }
                     }
                 }
@@ -376,18 +381,21 @@ void ConvLayer::clear_gradients()
 
 Shape ConvLayer::get_output_shape(const Shape& input_shape) const
 {
-    if (input_shape.rank() != 4) {
-        throw std::invalid_argument("Architecture error: ConvLayer requires a 4D input (Batch, Channels, Height, Width).");
+    if (input_shape.rank() != 4)
+    {
+        throw std::invalid_argument(
+            "Architecture error: ConvLayer requires a 4D input (Batch, Channels, Height, Width).");
     }
-    if (input_shape.channels() != in_c_ || input_shape.height() != in_h_ || input_shape.width() != in_w_) {
+    if (input_shape.channels() != in_c_ || input_shape.height() != in_h_ || input_shape.width() != in_w_)
+    {
         throw std::invalid_argument("Architecture error: ConvLayer input dimensions do not match layer configuration.");
     }
-    return {input_shape.batch(), out_c_, out_h_, out_w_};
+    return { input_shape.batch(), out_c_, out_h_, out_w_ };
 }
 
 Shape ConvLayer::get_input_shape(const Shape& output_shape) const
 {
-    return {output_shape.batch(), in_c_, in_h_, in_w_};
+    return { output_shape.batch(), in_c_, in_h_, in_w_ };
 }
 
 void ConvLayer::save(std::ostream& os) const

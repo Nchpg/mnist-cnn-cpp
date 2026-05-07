@@ -93,12 +93,30 @@ public:
     }
 
     // Pour le format NCHW (Batch, Channels, Height, Width) - Rank 4
-    size_t batch() const    { return dims_[0]; }
-    size_t channels() const { return dims_[1]; }
-    size_t height() const   { return dims_[2]; }
-    size_t width() const    { return dims_[3]; }
+    size_t batch() const
+    {
+        return dims_[0];
+    }
+    size_t channels() const
+    {
+        return dims_[1];
+    }
+    size_t height() const
+    {
+        return dims_[2];
+    }
+    size_t width() const
+    {
+        return dims_[3];
+    }
 
     // Alias utile pour les tenseurs 2D comme en sortie de DenseLayer / Flatten (Batch, Features)
-    size_t features() const { return dims_[1]; }
-    size_t classes() const { return dims_[1]; }
+    size_t features() const
+    {
+        return dims_[1];
+    }
+    size_t classes() const
+    {
+        return dims_[1];
+    }
 };

@@ -52,7 +52,7 @@ void CNN::build_from_json(const nlohmann::json& config_data)
     size_t c = config_data["input_shape"]["channels"];
     size_t h = config_data["input_shape"]["height"];
     size_t w = config_data["input_shape"]["width"];
-    input_shape_ = Shape({NULL, c, h, w});
+    input_shape_ = Shape({ NULL, c, h, w });
 
     if (config_data.contains("hyperparameters"))
     {
@@ -97,8 +97,8 @@ void CNN::build_from_json(const nlohmann::json& config_data)
         {
             size_t filters = layer_def["filters"];
             size_t kernel_size = layer_def["kernel_size"];
-            auto layer = std::make_unique<ConvLayer>(current_shape.height(), current_shape.width(), current_shape.channels(),
-                                                     kernel_size, filters, gen_);
+            auto layer = std::make_unique<ConvLayer>(current_shape.height(), current_shape.width(),
+                                                     current_shape.channels(), kernel_size, filters, gen_);
             current_shape = layer->get_output_shape(current_shape);
             model_.add(std::move(layer));
         }
@@ -146,8 +146,8 @@ void CNN::build_from_json(const nlohmann::json& config_data)
         }
         else if (type == "BatchNorm")
         {
-            auto layer =
-                std::make_unique<BatchNormLayer>(current_shape.channels(), current_shape.height(), current_shape.width());
+            auto layer = std::make_unique<BatchNormLayer>(current_shape.channels(), current_shape.height(),
+                                                          current_shape.width());
             current_shape = layer->get_output_shape(current_shape);
             model_.add(std::move(layer));
         }
@@ -267,7 +267,8 @@ void CNN::train(Dataset& dataset, size_t epochs)
             dataset.get_batch_images(sample, batch_size, batch_images);
             dataset.get_batch_labels(sample, batch_size, batch_labels);
 
-            batch_images.reshape(Shape({ static_cast<size_t>(batch_size), input_shape_.channels(), input_shape_.height(), input_shape_.width() }));
+            batch_images.reshape(Shape({ static_cast<size_t>(batch_size), input_shape_.channels(),
+                                         input_shape_.height(), input_shape_.width() }));
 
             const Tensor& output = model_.forward(batch_images, contexts, true);
 
@@ -336,8 +337,8 @@ scalar_t CNN::accuracy(const Dataset& dataset)
     size_t correct = 0;
     const size_t eval_batch_size = 64;
 
-    Tensor batch_images(Shape({ eval_batch_size, input_shape_.channels(), input_shape_.height(), input_shape_.width() }),
-                        0.0f);
+    Tensor batch_images(
+        Shape({ eval_batch_size, input_shape_.channels(), input_shape_.height(), input_shape_.width() }), 0.0f);
     std::vector<size_t> batch_labels;
     std::vector<std::unique_ptr<LayerContext>> contexts;
 
@@ -347,8 +348,8 @@ scalar_t CNN::accuracy(const Dataset& dataset)
         dataset.get_batch_images(i, actual_batch_size, batch_images);
         dataset.get_batch_labels(i, actual_batch_size, batch_labels);
 
-        batch_images.reshape(
-            Shape({ static_cast<size_t>(actual_batch_size), input_shape_.channels(), input_shape_.height(), input_shape_.width() }));
+        batch_images.reshape(Shape({ static_cast<size_t>(actual_batch_size), input_shape_.channels(),
+                                     input_shape_.height(), input_shape_.width() }));
 
         const Tensor& logits = model_.forward(batch_images, contexts, false);
         auto predictions = Utils::argmax(logits);
@@ -444,8 +445,8 @@ void CNN::load_from_model(const std::string& path)
 void CNN::print_architecture() const
 {
     std::cout << "CNN Architecture:\n";
-    std::cout << "  Input Shape: " << input_shape_.channels() << "x" << input_shape_.height() << "x" << input_shape_.width()
-              << "\n";
+    std::cout << "  Input Shape: " << input_shape_.channels() << "x" << input_shape_.height() << "x"
+              << input_shape_.width() << "\n";
     std::cout << "  Hyperparameters:\n";
     std::cout << "    Batch Size: " << hp_.batch_size << "\n";
     std::cout << "    Optimizer:\n";

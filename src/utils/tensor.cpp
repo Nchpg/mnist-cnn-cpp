@@ -69,14 +69,14 @@ void Tensor::fill(scalar_t value)
 void Tensor::fill_random_mask(scalar_t ratio, scalar_t scale)
 {
     size_t n = data_.size();
-    #pragma omp parallel if (n > 10000)
+#pragma omp parallel if (n > 10000)
     {
         // each thread create a random generator (because not thread-safe)
         thread_local std::mt19937 gen(std::random_device{}());
         std::uniform_real_distribution<scalar_t> dist(0.0f, 1.0f);
 
-        // divide the work for each thread
-        #pragma omp for
+// divide the work for each thread
+#pragma omp for
         for (size_t i = 0; i < n; ++i)
         {
             data_[i] = (dist(gen) > ratio) ? scale : 0.0f;
@@ -105,7 +105,7 @@ Tensor& Tensor::operator+=(const Tensor& other)
         throw std::invalid_argument("Shapes mismatch in operator+=");
     }
     size_t n = data_.size();
-    #pragma omp parallel for if (n > 10000)
+#pragma omp parallel for if (n > 10000)
     for (size_t i = 0; i < n; ++i)
         data_[i] += other.data_[i];
     return *this;
@@ -127,7 +127,7 @@ Tensor& Tensor::operator-=(const Tensor& other)
 void Tensor::add_scaled(const Tensor& other, scalar_t scale)
 {
     size_t n = data_.size();
-    #pragma omp parallel for if (n > 10000)
+#pragma omp parallel for if (n > 10000)
     for (size_t i = 0; i < n; ++i)
         data_[i] += other.data_[i] * scale;
 }
@@ -143,7 +143,7 @@ void Tensor::add_bias(const Tensor& bias)
     scalar_t* act_ptr = this->data_ptr();
     const scalar_t* bias_ptr = bias.data_ptr();
 
-    #pragma omp parallel for if (batch_size * output_size > 10000)
+#pragma omp parallel for if (batch_size * output_size > 10000)
     for (size_t b = 0; b < batch_size; ++b)
     {
         size_t row_offset = b * output_size;
@@ -154,21 +154,20 @@ void Tensor::add_bias(const Tensor& bias)
     }
 }
 
-
 void Tensor::sum_rows(const Tensor& input, Tensor& output)
 {
     assert(input.rank() == 2 && "sum_rows requires a 2D input tensor");
-    
+
     size_t rows = input.shape()[0];
     size_t cols = input.shape()[1];
 
-    output.reshape(Shape({rows, 1}));
+    output.reshape(Shape({ rows, 1 }));
     output.fill(0.0f);
 
     const scalar_t* in_ptr = input.data_ptr();
     scalar_t* out_ptr = output.data_ptr();
 
-    #pragma omp parallel for
+#pragma omp parallel for
     for (size_t r = 0; r < rows; ++r)
     {
         scalar_t sum = 0.0f;
@@ -183,11 +182,11 @@ void Tensor::sum_rows(const Tensor& input, Tensor& output)
 void Tensor::sum_cols(const Tensor& input, Tensor& output)
 {
     assert(input.rank() == 2 && "sum_cols requires a 2D input tensor");
-    
+
     size_t rows = input.shape()[0];
     size_t cols = input.shape()[1];
 
-    output.reshape(Shape({cols, 1}));
+    output.reshape(Shape({ cols, 1 }));
     output.fill(0.0f);
 
     const scalar_t* in_ptr = input.data_ptr();
