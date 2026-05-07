@@ -66,6 +66,7 @@ public:
     Tensor& operator+=(const Tensor& other);
     Tensor& operator-=(const Tensor& other);
     void add_scaled(const Tensor& other, scalar_t scale);
+    void add_bias(const Tensor& bias);
     static void sum_rows(const Tensor& input, Tensor& output);
 
     static void matmul(const Tensor& A, const Tensor& B, Tensor& C, bool transA = false, bool transB = false);

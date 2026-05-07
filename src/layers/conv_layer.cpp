@@ -75,8 +75,8 @@ const Tensor& ConvLayer::forward(const Tensor& input, std::unique_ptr<LayerConte
     }
     ConvContext* conv_ctx = get_context<ConvContext>(ctx);
 
-    Shape input_shape = input.shape();
-    size_t batch_size = input_shape.batch();
+    const Shape input_shape = input.shape();
+    const size_t batch_size = input_shape.batch();
 
     conv_ctx->output.reshape(get_output_shape(input.shape()));
     conv_ctx->input_patches_2d.reshape(Shape({ in_c_ * k_size_ * k_size_, batch_size * out_h_ * out_w_ }));
@@ -200,8 +200,8 @@ const Tensor& ConvLayer::backward(const Tensor& gradient, std::unique_ptr<LayerC
 
     ConvContext* conv_ctx = get_context<ConvContext>(ctx);
 
-    Shape output_shape = gradient.shape();
-    size_t batch_size = output_shape.batch();
+    const Shape output_shape = gradient.shape();
+    const size_t batch_size = output_shape.batch();
 
     filters_grad_.reshape(filters_.shape());
     biases_grad_.reshape(biases_.shape());
@@ -370,10 +370,8 @@ const Tensor& ConvLayer::backward(const Tensor& gradient, std::unique_ptr<LayerC
 
 void ConvLayer::clear_gradients()
 {
-    if (filters_grad_.size() > 0)
-        filters_grad_.fill(0.0f);
-    if (biases_grad_.size() > 0)
-        biases_grad_.fill(0.0f);
+    filters_grad_.fill(0.0f);
+    biases_grad_.fill(0.0f);
 }
 
 Shape ConvLayer::get_output_shape(const Shape& input_shape) const

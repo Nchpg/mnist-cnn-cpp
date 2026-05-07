@@ -109,9 +109,31 @@ Tensor& Tensor::operator-=(const Tensor& other)
 void Tensor::add_scaled(const Tensor& other, scalar_t scale)
 {
     size_t n = data_.size();
-#pragma omp parallel for if (n > 10000)
+    #pragma omp parallel for if (n > 10000)
     for (size_t i = 0; i < n; ++i)
         data_[i] += other.data_[i] * scale;
+}
+
+void Tensor::add_bias(const Tensor& bias)
+{
+    assert(rank() == 2 && "add_bias: Current tensor must be 2D (matrix)");
+    assert(bias.size() == shape_[1] && "add_bias: Bias size must match output dimension");
+
+    size_t batch_size = shape_.batch();
+    size_t output_size = shape_.features();
+
+    scalar_t* act_ptr = this->data_ptr();
+    const scalar_t* bias_ptr = bias.data_ptr();
+
+    #pragma omp parallel for if (batch_size * output_size > 10000)
+    for (size_t b = 0; b < batch_size; ++b)
+    {
+        size_t row_offset = b * output_size;
+        for (size_t i = 0; i < output_size; ++i)
+        {
+            act_ptr[row_offset + i] += bias_ptr[i];
+        }
+    }
 }
 
 
