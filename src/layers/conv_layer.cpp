@@ -42,14 +42,9 @@ const Tensor& ConvLayer::forward(const Tensor& input, std::unique_ptr<LayerConte
     if (conv_ctx->col_buffer.size() < required_col_size)
     {
         conv_ctx->col_buffer.reshape(Shape({ in_c_ * k_size_ * k_size_, batch_size * out_h_ * out_w_ }));
-        conv_ctx->gemm_out.reshape(Shape({ out_c_, batch_size * out_h_ * out_w_ }));
     }
-    else
-    {
-        // Use Shape to avoid reallocating if size is enough
-        conv_ctx->col_buffer.reshape(Shape({ in_c_ * k_size_ * k_size_, batch_size * out_h_ * out_w_ }));
-        conv_ctx->gemm_out.reshape(Shape({ out_c_, batch_size * out_h_ * out_w_ }));
-    }
+    conv_ctx->col_buffer.reshape(Shape({ in_c_ * k_size_ * k_size_, batch_size * out_h_ * out_w_ }));
+    conv_ctx->gemm_out.reshape(Shape({ out_c_, batch_size * out_h_ * out_w_ }));
 
 #pragma omp parallel for collapse(2) if (batch_size * in_c_ > 4)
     for (size_t b = 0; b < batch_size; ++b)
@@ -192,9 +187,9 @@ void ConvLayer::clear_gradients()
         biases_grad_.fill(0.0f);
 }
 
-Shape3D ConvLayer::get_output_shape(const Shape3D& input_shape) const
+Shape3D ConvLayer::get_output_shape(const Shape3D&) const
 {
-    return { out_c_, input_shape.height - k_size_ + 1, input_shape.width - k_size_ + 1 };
+    return { out_c_, out_h_, out_w_ };
 }
 
 void ConvLayer::save(std::ostream& os) const

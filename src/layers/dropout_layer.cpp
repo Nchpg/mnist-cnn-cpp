@@ -31,24 +31,16 @@ const Tensor& DropoutLayer::forward(const Tensor& input, std::unique_ptr<LayerCo
     scalar_t* mask_ptr = dropout_ctx->mask.data_ptr();
     scalar_t* out_ptr = dropout_ctx->output.data_ptr();
 
-    static thread_local std::mt19937 gen([] {
-        std::random_device rd;
-        return rd();
-    }());
-    std::uniform_real_distribution<scalar_t> dist(0.0f, 1.0f);
-
-#pragma omp parallel for if (n > 10000)
-    for (size_t i = 0; i < n; ++i)
+#pragma omp parallel if (n > 10000)
     {
-        if (dist(gen) > ratio_)
+        thread_local std::mt19937 gen(std::random_device{}());
+        std::uniform_real_distribution<scalar_t> dist(0.0f, 1.0f);
+#pragma omp for
+        for (size_t i = 0; i < n; ++i)
         {
-            mask_ptr[i] = scale;
+            mask_ptr[i] = (dist(gen) > ratio_) ? scale : 0.0f;
+            out_ptr[i] = in_ptr[i] * mask_ptr[i];
         }
-        else
-        {
-            mask_ptr[i] = 0.0f;
-        }
-        out_ptr[i] = in_ptr[i] * mask_ptr[i];
     }
 
     return dropout_ctx->output;

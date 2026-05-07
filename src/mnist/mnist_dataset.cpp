@@ -1,4 +1,4 @@
-#include "data/mnist_dataset.hpp"
+#include "mnist/mnist_dataset.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -10,8 +10,6 @@
 #include <random>
 #include <sstream>
 #include <stdexcept>
-
-#include "data/constants.hpp"
 
 void MnistDataset::compute_normalization(const std::vector<scalar_t>& images_data)
 {
@@ -69,25 +67,25 @@ MnistDataset MnistDataset::load_bin(const std::string& path, size_t limit)
 
     MnistDataset dataset;
     size_t capacity = limit > 0 ? limit : 10000;
-    dataset.all_images_data_.reserve(capacity * PIXELS);
+    dataset.all_images_data_.reserve(capacity * MnistDataset::PIXELS);
     dataset.labels_.reserve(capacity);
     dataset.indices_.reserve(capacity);
 
     unsigned char label;
-    std::vector<unsigned char> pixels(PIXELS);
+    std::vector<unsigned char> pixels(MnistDataset::PIXELS);
 
     while (limit == 0 || dataset.count_ < limit)
     {
         if (!file.read(reinterpret_cast<char*>(&label), 1))
             break;
-        if (!file.read(reinterpret_cast<char*>(pixels.data()), PIXELS))
+        if (!file.read(reinterpret_cast<char*>(pixels.data()), MnistDataset::PIXELS))
         {
             throw std::runtime_error("Incomplete record in binary file: " + path);
         }
 
-        for (size_t i = 0; i < PIXELS; ++i)
+        for (size_t i = 0; i < MnistDataset::PIXELS; ++i)
         {
-            scalar_t val = static_cast<scalar_t>(pixels[i]) / NORMALIZE_DIVISOR;
+            scalar_t val = static_cast<scalar_t>(pixels[i]) / MnistDataset::NORMALIZE_DIVISOR;
             dataset.all_images_data_.push_back(val);
         }
         dataset.labels_.push_back(label);
@@ -110,7 +108,7 @@ MnistDataset MnistDataset::load_csv(const std::string& path, size_t limit)
 
     MnistDataset dataset;
     size_t capacity = limit > 0 ? limit : 10000;
-    dataset.all_images_data_.reserve(capacity * PIXELS);
+    dataset.all_images_data_.reserve(capacity * MnistDataset::PIXELS);
     dataset.labels_.reserve(capacity);
     dataset.indices_.reserve(capacity);
 
@@ -125,11 +123,12 @@ MnistDataset MnistDataset::load_csv(const std::string& path, size_t limit)
             return;
 
         dataset.labels_.push_back(static_cast<unsigned char>(std::stoi(token)));
-        for (size_t i = 0; i < PIXELS; ++i)
+        for (size_t i = 0; i < MnistDataset::PIXELS; ++i)
         {
             if (!std::getline(ss, token, ','))
                 throw std::runtime_error("Invalid CSV row");
-            dataset.all_images_data_.push_back(static_cast<scalar_t>(std::stoi(token)) / NORMALIZE_DIVISOR);
+            dataset.all_images_data_.push_back(static_cast<scalar_t>(std::stoi(token))
+                                               / MnistDataset::NORMALIZE_DIVISOR);
         }
         dataset.indices_.push_back(dataset.count_);
         dataset.count_++;
@@ -161,9 +160,18 @@ void MnistDataset::get_batch_images(size_t start_idx, size_t batch_size, Tensor&
 {
     if (start_idx + batch_size > count_)
         batch_size = count_ - start_idx;
-    if (out_batch.rank() != 2 || out_batch.shape()[0] != batch_size || out_batch.shape()[1] != PIXELS)
+    if (out_batch.rank() != 2 || out_batch.shape()[0] != batch_size || out_batch.shape()[1] != MnistDataset::PIXELS)
+
+        out_batch.reshape(Shape({ batch_size, MnistDataset::PIXELS }));
+
+#pragma omp parallel for
+    for (size_t b = 0; b < batch_size; ++b)
     {
-        out_batch.reshape(Shape({ batch_size, PIXELS }));
+        size_t img_idx = indices_[start_idx + b];
+        for (size_t i = 0; i < MnistDataset::PIXELS; ++i)
+        {
+            out_batch(b, i) = all_images_data_[img_idx * MnistDataset::PIXELS + i];
+        }
     }
 
 #pragma omp parallel for

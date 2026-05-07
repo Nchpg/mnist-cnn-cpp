@@ -15,9 +15,11 @@ const Tensor& FlattenLayer::forward(const Tensor& input, std::unique_ptr<LayerCo
     auto* flatten_ctx = static_cast<FlattenContext*>(ctx.get());
 
     size_t batch_size = input.shape()[0];
-    flatten_ctx->output.reshape(Shape({ batch_size, input_channels_ * input_height_ * input_width_ }));
+    size_t flat_size = input_channels_ * input_height_ * input_width_;
 
-    std::copy(input.data().begin(), input.data().end(), flatten_ctx->output.data().begin());
+    flatten_ctx->output.reshape(Shape({ batch_size, flat_size }));
+
+    std::copy_n(input.data_ptr(), input.size(), flatten_ctx->output.data_ptr());
 
     (void)is_training;
     return flatten_ctx->output;
@@ -66,5 +68,5 @@ nlohmann::json FlattenLayer::get_config() const
 
 Shape3D FlattenLayer::get_output_shape(const Shape3D& input_shape) const
 {
-    return { 1, 1, input_shape.channels * input_shape.height * input_shape.width };
+    return { input_shape.channels * input_shape.height * input_shape.width, 1, 1 };
 }

@@ -6,6 +6,8 @@ AdamOptimizer::AdamOptimizer(scalar_t learning_rate, scalar_t beta1, scalar_t be
     , beta2_(beta2)
     , epsilon_(epsilon)
     , t_(0)
+    , beta1_t_(beta1)
+    , beta2_t_(beta2)
 {}
 
 void AdamOptimizer::set_parameters(const std::vector<Tensor*>& weights, const std::vector<Tensor*>& grads)
@@ -31,10 +33,10 @@ void AdamOptimizer::set_parameters(const std::vector<Tensor*>& weights, const st
 void AdamOptimizer::step()
 {
     t_++;
-    scalar_t beta1_t = std::pow(beta1_, static_cast<scalar_t>(t_));
-    scalar_t beta2_t = std::pow(beta2_, static_cast<scalar_t>(t_));
-    scalar_t m_corr = 1.0f / (1.0f - beta1_t);
-    scalar_t v_corr = 1.0f / (1.0f - beta2_t);
+    beta1_t_ *= beta1_;
+    beta2_t_ *= beta2_;
+    scalar_t m_corr = 1.0f / (1.0f - beta1_t_);
+    scalar_t v_corr = 1.0f / (1.0f - beta2_t_);
 
     for (size_t i = 0; i < weights_.size(); ++i)
     {
@@ -64,6 +66,8 @@ void AdamOptimizer::step()
 void AdamOptimizer::reset()
 {
     t_ = 0;
+    beta1_t_ = beta1_;
+    beta2_t_ = beta2_;
     for (auto& m_mat : m_)
         m_mat.fill(0.0f);
     for (auto& v_mat : v_)

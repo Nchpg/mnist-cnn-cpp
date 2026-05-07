@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include "data/constants.hpp"
+#include "mnist/mnist_dataset.hpp"
 
 using namespace std;
 using namespace cv;
@@ -20,17 +20,18 @@ bool parseCSVLine(const string& line, uint8_t& label, Mat& image)
         return false;
     label = static_cast<uint8_t>(stoi(val));
 
-    image = Mat(IMG_HEIGHT, IMG_WIDTH, CV_8UC1);
+    image = Mat(MnistDataset::IMG_HEIGHT, MnistDataset::IMG_WIDTH, CV_8UC1);
     int i = 0;
     while (getline(ss, val, ','))
     {
-        if (i < static_cast<int>(PIXELS))
+        if (i < static_cast<int>(MnistDataset::PIXELS))
         {
-            image.at<uint8_t>(i / IMG_WIDTH, i % IMG_WIDTH) = static_cast<uint8_t>(stoi(val));
+            image.at<uint8_t>(i / MnistDataset::IMG_WIDTH, i % MnistDataset::IMG_WIDTH) =
+                static_cast<uint8_t>(stoi(val));
             i++;
         }
     }
-    return i == static_cast<int>(PIXELS);
+    return i == static_cast<int>(MnistDataset::PIXELS);
 }
 
 Mat augmentImage(const Mat& input, mt19937& gen)

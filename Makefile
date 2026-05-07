@@ -19,7 +19,7 @@ AUGMENT_TARGET := mnist_augment
 COMMON_SRC := src/core/cnn.cpp \
                src/utils/tensor.cpp \
                src/layers/dense_layer.cpp \
-               src/data/mnist_dataset.cpp \
+               src/mnist/mnist_dataset.cpp \
                src/layers/pooling_layer.cpp \
                src/layers/conv_layer.cpp \
                src/layers/batchnorm_layer.cpp \
@@ -35,7 +35,7 @@ COMMON_SRC := src/core/cnn.cpp \
                src/layers/dropout_layer.cpp
 CLI_SRC := src/core/main.cpp $(COMMON_SRC)
 SERVER_SRC := src/core/server.cpp $(COMMON_SRC)
-AUGMENT_SRC := src/data/data_augmentation.cpp
+AUGMENT_SRC := src/mnist/data_augmentation.cpp
 
 CLI_OBJ := $(CLI_SRC:.cpp=.o)
 SERVER_OBJ := $(SERVER_SRC:.cpp=.o)
@@ -62,7 +62,7 @@ $(SERVER_TARGET): $(SERVER_OBJ)
 $(AUGMENT_TARGET): $(AUGMENT_OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LDLIBS) $(OPENCV_LDLIBS)
 
-src/data/data_augmentation.o: src/data/data_augmentation.cpp
+src/mnist/data_augmentation.o: src/mnist/data_augmentation.cpp
 	$(CC) $(CFLAGS) $(OPENCV_CFLAGS) -c $< -o $@
 
 %.o: %.cpp

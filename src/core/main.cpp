@@ -6,8 +6,8 @@
 #include <string_view>
 
 #include "core/cnn.hpp"
-#include "data/mnist_dataset.hpp"
 #include "layers/activation/activation.hpp"
+#include "mnist/mnist_dataset.hpp"
 
 static void usage(const char* program)
 {
@@ -156,9 +156,7 @@ int main(int argc, char** argv)
         cnn.set_hyperparameters(hp);
 
         MnistDataset train = MnistDataset::load(csv_path, limit);
-        train.mean_ = cnn.mean();
-        train.std_ = cnn.std();
-        train.normalize_ = cnn.normalize();
+        train.set_normalization(cnn.mean(), cnn.std(), cnn.normalize());
         train.apply_normalization();
 
         std::cout << "Resuming training from model: " << model_in << " using " << csv_path << std::endl;
@@ -188,9 +186,7 @@ int main(int argc, char** argv)
         CNN cnn;
         cnn.load_from_model(model_in);
         MnistDataset test = MnistDataset::load(csv_path, limit);
-        test.mean_ = cnn.mean();
-        test.std_ = cnn.std();
-        test.normalize_ = cnn.normalize();
+        test.set_normalization(cnn.mean(), cnn.std(), cnn.normalize());
         test.apply_normalization();
 
         std::cout << "accuracy " << 100.0f * cnn.accuracy(test) << "% on " << test.count() << " images\n";

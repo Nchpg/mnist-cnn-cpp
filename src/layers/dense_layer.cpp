@@ -91,10 +91,13 @@ const Tensor& DenseLayer::backward(const Tensor& gradient, std::unique_ptr<Layer
 
 void DenseLayer::clear_gradients()
 {
-    if (weights_grad_.size() > 0)
-        weights_grad_.fill(0.0f);
-    if (biases_grad_.size() > 0)
-        biases_grad_.fill(0.0f);
+    if (weights_grad_.size() == 0)
+    {
+        weights_grad_.reshape(weights_.shape());
+        biases_grad_.reshape(biases_.shape());
+    }
+    weights_grad_.fill(0.0f);
+    biases_grad_.fill(0.0f);
 }
 
 void DenseLayer::save(std::ostream& os) const

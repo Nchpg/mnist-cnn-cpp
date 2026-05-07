@@ -2,7 +2,6 @@
 
 #include <stdexcept>
 
-#include "data/constants.hpp"
 #include "data/dataset.hpp"
 #include "utils/tensor.hpp"
 
@@ -15,21 +14,35 @@ private:
     std::vector<size_t> indices_;
     std::mt19937 gen_;
 
-    static bool line_looks_like_header(const std::string& line)
-    {
-        size_t pos = 0;
-        while (pos < line.length() && std::isspace(line[pos]))
-            pos++;
-        return pos >= line.length() || !std::isdigit(line[pos]);
-    }
-
-public:
     scalar_t mean_ = 0.0f;
     scalar_t std_ = 1.0f;
     bool normalize_ = false;
 
+    static bool line_looks_like_header(const std::string& line)
+    {
+        size_t pos = 0;
+        while (pos < line.length() && std::isspace(line[pos]))
+        {
+            pos++;
+        }
+        return pos >= line.length() || !std::isdigit(line[pos]);
+    }
+
+public:
+    static constexpr size_t IMG_WIDTH = 28;
+    static constexpr size_t IMG_HEIGHT = 28;
+    static constexpr size_t PIXELS = IMG_WIDTH * IMG_HEIGHT;
+    static constexpr size_t NUM_CLASSES = 10;
+    static constexpr float NORMALIZE_DIVISOR = 255.0f;
+
     void compute_normalization(const std::vector<scalar_t>& images_data);
     void apply_normalization();
+    void set_normalization(scalar_t mean, scalar_t std, bool normalize)
+    {
+        mean_ = mean;
+        std_ = std;
+        normalize_ = normalize;
+    }
 
     const std::vector<scalar_t>& images_data() const
     {
@@ -56,7 +69,7 @@ public:
     static MnistDataset load_csv(const std::string& path, size_t limit = 0);
     static MnistDataset load_bin(const std::string& path, size_t limit = 0);
 
-    size_t count() const
+    size_t count() const override
     {
         return count_;
     }

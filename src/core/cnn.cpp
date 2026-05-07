@@ -12,7 +12,6 @@
 #include <sstream>
 #include <stdexcept>
 
-#include "data/mnist_dataset.hpp"
 #include "layers/activation/activation.hpp"
 #include "layers/activation/relu_layer.hpp"
 #include "layers/activation/sigmoid_layer.hpp"
@@ -26,6 +25,7 @@
 #include "loss/cross_entropy_loss.hpp"
 #include "loss/loss.hpp"
 #include "loss/mse_loss.hpp"
+#include "mnist/mnist_dataset.hpp"
 #include "optimizers/adam_optimizer.hpp"
 #include "optimizers/optimizer.hpp"
 #include "optimizers/sgd_optimizer.hpp"
@@ -163,6 +163,17 @@ std::vector<scalar_t> CNN::predict(const Tensor& image) const
     Tensor img_batch = image;
     img_batch.reshape(Shape({ 1, input_shape_.channels, input_shape_.height, input_shape_.width }));
 
+    // Apply normalization if needed
+    if (normalize_input_)
+    {
+        scalar_t* data_ptr = img_batch.data_ptr();
+        size_t size = img_batch.size();
+        for (size_t i = 0; i < size; ++i)
+        {
+            data_ptr[i] = (data_ptr[i] - data_mean_) / data_std_;
+        }
+    }
+
     std::vector<std::unique_ptr<LayerContext>> contexts;
     const Tensor& probs = model_.forward(img_batch, contexts, false);
 
@@ -176,6 +187,17 @@ int CNN::predict_label(const Tensor& image) const
 {
     Tensor img_batch = image;
     img_batch.reshape(Shape({ 1, input_shape_.channels, input_shape_.height, input_shape_.width }));
+
+    // Apply normalization if needed
+    if (normalize_input_)
+    {
+        scalar_t* data_ptr = img_batch.data_ptr();
+        size_t size = img_batch.size();
+        for (size_t i = 0; i < size; ++i)
+        {
+            data_ptr[i] = (data_ptr[i] - data_mean_) / data_std_;
+        }
+    }
 
     std::vector<std::unique_ptr<LayerContext>> contexts;
     const Tensor& probs = model_.forward(img_batch, contexts, false);
@@ -312,7 +334,8 @@ scalar_t CNN::accuracy(const Dataset& dataset)
     size_t correct = 0;
     const size_t eval_batch_size = 64;
 
-    Tensor batch_images;
+    Tensor batch_images(Shape({ eval_batch_size, input_shape_.channels, input_shape_.height, input_shape_.width }),
+                        0.0f);
     std::vector<size_t> batch_labels;
     std::vector<std::unique_ptr<LayerContext>> contexts;
 
@@ -368,7 +391,7 @@ void CNN::save(const std::string& path) const
     std::string header_str = header.dump();
     uint64_t header_len = header_str.length();
 
-    file.write(MAGIC, 4);
+    file.write(MAGIC, std::strlen(MAGIC));
     file.write(reinterpret_cast<const char*>(&header_len), sizeof(header_len));
     file.write(header_str.c_str(), header_len);
 
@@ -388,9 +411,10 @@ void CNN::load_from_model(const std::string& path)
     if (!file.is_open())
         throw std::runtime_error("Load failed: " + path);
 
-    char magic[4];
-    file.read(magic, 4);
-    if (std::strncmp(magic, MAGIC, 4) != 0)
+    char magic[32];
+    file.read(magic, std::strlen(MAGIC));
+    magic[std::strlen(MAGIC)] = '\0';
+    if (std::strcmp(magic, MAGIC) != 0)
     {
         throw std::runtime_error("Unsupported model format or bad magic");
     }

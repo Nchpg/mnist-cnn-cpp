@@ -1,5 +1,6 @@
 #include <arpa/inet.h>
 #include <array>
+#include <atomic>
 #include <condition_variable>
 #include <csignal>
 #include <fcntl.h>
@@ -22,8 +23,7 @@
 #include <vector>
 
 #include "core/cnn.hpp"
-#include "data/constants.hpp"
-#include "data/mnist_dataset.hpp"
+#include "mnist/mnist_dataset.hpp"
 
 using json = nlohmann::json;
 
@@ -92,7 +92,7 @@ private:
     std::queue<std::function<void()>> tasks;
     std::mutex queue_mutex;
     std::condition_variable condition;
-    bool stop;
+    std::atomic<bool> stop;
 };
 
 static void set_non_blocking(int fd)
@@ -132,7 +132,7 @@ static void send_response(int client_fd, const std::string& status, const std::s
     send(client_fd, response.data(), response.length(), 0);
 }
 
-static bool parse_pixels(const std::string& body, Tensor& image, const CNN& cnn)
+static bool parse_pixels(const std::string& body, Tensor& image)
 {
     try
     {
@@ -141,15 +141,15 @@ static bool parse_pixels(const std::string& body, Tensor& image, const CNN& cnn)
             return false;
 
         const auto& pixels = j["pixels"];
-        if (pixels.size() != PIXELS)
+        if (pixels.size() != MnistDataset::PIXELS)
             return false;
 
-        for (size_t i = 0; i < PIXELS; i++)
+        for (size_t i = 0; i < MnistDataset::PIXELS; i++)
         {
-            scalar_t raw = static_cast<scalar_t>(pixels[i]) / NORMALIZE_DIVISOR;
-            size_t row = i / IMG_WIDTH;
-            size_t col = i % IMG_WIDTH;
-            image(col * IMG_HEIGHT + row, 0) = cnn.normalize() ? (raw - cnn.mean()) / cnn.std() : raw;
+            scalar_t raw = static_cast<scalar_t>(pixels[i]) / MnistDataset::NORMALIZE_DIVISOR;
+            size_t row = i / MnistDataset::IMG_WIDTH;
+            size_t col = i % MnistDataset::IMG_WIDTH;
+            image(col * MnistDataset::IMG_HEIGHT + row, 0) = raw;
         }
         return true;
     }
@@ -161,8 +161,8 @@ static bool parse_pixels(const std::string& body, Tensor& image, const CNN& cnn)
 
 static void handle_predict(int client_fd, const CNN& cnn, const std::string& body)
 {
-    Tensor image(Shape({ PIXELS, 1 }), 0.0f);
-    if (!parse_pixels(body, image, cnn))
+    Tensor image(Shape({ MnistDataset::PIXELS, 1 }), 0.0f);
+    if (!parse_pixels(body, image))
     {
         send_response(client_fd, "400 Bad Request", "text/plain", "malformed pixels\n");
         return;

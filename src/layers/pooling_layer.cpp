@@ -105,7 +105,6 @@ const Tensor& PoolingLayer::backward(const Tensor& gradient, std::unique_ptr<Lay
                     size_t in_r = max_in_idx / in_w_;
                     size_t in_c = max_in_idx % in_w_;
 
-#pragma omp atomic
                     pool_ctx->grad_input(b, c, in_r, in_c) += gradient(b, c, i, j);
                 }
             }

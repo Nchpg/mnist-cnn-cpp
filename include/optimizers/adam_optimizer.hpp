@@ -9,6 +9,8 @@ private:
     scalar_t beta2_;
     scalar_t epsilon_;
     size_t t_;
+    scalar_t beta1_t_;
+    scalar_t beta2_t_;
     std::vector<Tensor> m_;
     std::vector<Tensor> v_;
 
