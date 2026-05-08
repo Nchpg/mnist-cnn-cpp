@@ -2,6 +2,10 @@
 
 A high-performance convolutional neural network (CNN) implementation written from scratch in C++17, optimized with OpenMP for parallelism. This project enables training, testing, and deploying a handwritten digit recognition (MNIST) model via a CLI interface or an integrated web server.
 
+## 🎥 Demo
+
+![Demo](assets/mnist_demo.gif)
+
 ## 🚀 Key Features
 
 - **Flexible Architecture**: Network configuration via a JSON file (`architecture.json`).
