@@ -104,10 +104,7 @@ Tensor& Tensor::operator+=(const Tensor& other)
     {
         throw std::invalid_argument("Shapes mismatch in operator+=");
     }
-    size_t n = data_.size();
-#pragma omp parallel for if (n > 10000)
-    for (size_t i = 0; i < n; ++i)
-        data_[i] += other.data_[i];
+    elementwise(*this, other, *this, [](scalar_t a, scalar_t b) { return a + b; });
     return *this;
 }
 
@@ -117,21 +114,14 @@ Tensor& Tensor::operator-=(const Tensor& other)
     {
         throw std::invalid_argument("Shapes mismatch in operator-=");
     }
-    size_t n = data_.size();
-#pragma omp parallel for if (n > 10000)
-    for (size_t i = 0; i < n; ++i)
-        data_[i] -= other.data_[i];
+    elementwise(*this, other, *this, [](scalar_t a, scalar_t b) { return a - b; });
     return *this;
 }
 
 void Tensor::add_scaled(const Tensor& other, scalar_t scale)
 {
-    size_t n = data_.size();
-#pragma omp parallel for if (n > 10000)
-    for (size_t i = 0; i < n; ++i)
-        data_[i] += other.data_[i] * scale;
+    elementwise(*this, other, *this, [scale](scalar_t a, scalar_t b) { return a + b * scale; });
 }
-
 void Tensor::add_bias(const Tensor& bias)
 {
     assert(rank() == 2 && "add_bias: Current tensor must be 2D (matrix)");

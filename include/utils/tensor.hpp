@@ -61,6 +61,33 @@ public:
     void fill(scalar_t value);
     void fill_random_mask(scalar_t ratio, scalar_t scale);
 
+    template <typename Func>
+    void map(const Func& func)
+    {
+        size_t n = data_.size();
+#pragma omp parallel for if (n > 10000)
+        for (size_t i = 0; i < n; ++i)
+        {
+            data_[i] = func(data_[i]);
+        }
+    }
+
+    template <typename Func>
+    static void elementwise(const Tensor& a, const Tensor& b, Tensor& out, const Func& func)
+    {
+        assert(a.size() == b.size());
+        out.reshape(a.shape());
+        size_t n = out.size();
+        const scalar_t* a_ptr = a.data_ptr();
+        const scalar_t* b_ptr = b.data_ptr();
+        scalar_t* out_ptr = out.data_ptr();
+#pragma omp parallel for if (n > 10000)
+        for (size_t i = 0; i < n; ++i)
+        {
+            out_ptr[i] = func(a_ptr[i], b_ptr[i]);
+        }
+    }
+
     void random_uniform(scalar_t scale, std::mt19937& gen);
     void random_normal(scalar_t std_dev, std::mt19937& gen);
 
