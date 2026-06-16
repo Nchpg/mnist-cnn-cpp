@@ -17,6 +17,7 @@ A high-performance convolutional neural network (CNN) implementation written fro
   - Web Server (port 8080) with a React interface for real-time drawing and prediction.
   - Built-in data augmentation tool (requires OpenCV).
   - **Flexible Data Formats**: Supports both CSV and Binary (.bin) files for datasets.
+  - **One-command deployment** with Docker Compose (backend + frontend + pretrained model).
 
 ## 🏗️ Default Architecture
 
@@ -25,6 +26,34 @@ The model configured in `architecture.json` features a robust structure:
 - Max Pooling (2x2).
 - Dropout (0.5) to prevent overfitting.
 - Dense output layer with Softmax for classification.
+
+## 🐳 Quick Start (Docker)
+
+The fastest way to run the full stack (backend API + React frontend + a
+pretrained model) without installing any dependency locally:
+
+```bash
+docker compose up --build
+```
+
+Then open **http://localhost:8080** and start drawing.
+
+To stop the stack:
+
+```bash
+docker compose down
+```
+
+The image bundles `mnist_cnn.model` by default. To embed a different pretrained
+model, edit `MODEL_FILE` in `docker-compose.yml`, or pass it at build time:
+
+```bash
+docker compose build --build-arg MODEL_FILE=final.model
+```
+
+> **Note:** the build uses `-march=native`, so the image is optimized for the
+> CPU that builds it. It is meant for local use, not for distribution to a
+> machine with a different architecture.
 
 ## 🛠️ Installation
 

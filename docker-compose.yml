@@ -1,0 +1,12 @@
+services:
+  mnist:
+    build:
+      context: .
+      args:
+        # Pretrained model copied into the image. Change to e.g. final.model.
+        MODEL_FILE: mnist_cnn.model
+    image: mnist-ocr
+    container_name: mnist-ocr
+    ports:
+      - "8079:8080"
+    restart: unless-stopped
