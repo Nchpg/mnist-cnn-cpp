@@ -3,8 +3,12 @@ CC := g++
 NIX_ENFORCE_NO_NATIVE :=
 export NIX_ENFORCE_NO_NATIVE
 
+# Override when the build host differs from the run host: a native build dies
+# with SIGILL on an older CPU.
+ARCH ?= native
+
 # Flags
-CFLAGS_COMMON := -std=c++17 -Wall -Wextra -Wpedantic -fopenmp -Iinclude -MMD -MP -march=native
+CFLAGS_COMMON := -std=c++17 -Wall -Wextra -Wpedantic -fopenmp -Iinclude -MMD -MP -march=$(ARCH)
 RELEASE_FLAGS := -O3 -flto -DNDEBUG
 DEBUG_FLAGS   := -g -Og -fsanitize=address -fsanitize=undefined
 

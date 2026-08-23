@@ -12,7 +12,11 @@ COPY Makefile ./
 COPY include ./include
 COPY src ./src
 
-RUN make mnist_server
+# Portable baseline, not the Makefile's native: the CI runner is not the host
+# that runs the image.
+ARG ARCH=x86-64-v2
+
+RUN make mnist_server ARCH=${ARCH}
 
 # ---- Runtime stage ----
 FROM debian:bookworm-slim
